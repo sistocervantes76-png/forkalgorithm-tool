@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Forkalgorithm — Free Chef Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#1a1714;--ink2:#3d3830;--ink3:#7a7168;
+  --cream:#faf6ef;--cream2:#f2ebe0;--cream3:#e8dece;
+  --terra:#bf5a2f;--terra-light:#f0d5c8;--terra-dark:#8c3e1c;
+  --white:#ffffff;--border:#dfd6ca;--r:10px;--rs:6px;
+}
+html{font-size:16px}
+body{font-family:'Outfit',sans-serif;background:var(--cream);color:var(--ink);min-height:100vh;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:680px;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+
+/* Header */
+.top{text-align:center;padding-bottom:2.5rem;border-bottom:1px solid var(--border);margin-bottom:2.5rem}
+.logo{font-family:'Cormorant Garamond',serif;font-size:.85rem;letter-spacing:.25em;text-transform:uppercase;color:var(--terra);margin-bottom:1.5rem;display:block}
+.headline{font-family:'Cormorant Garamond',serif;font-size:clamp(1.9rem,5vw,3rem);line-height:1.1;font-weight:600;color:var(--ink);margin-bottom:.75rem}
+.headline em{font-style:italic;color:var(--terra)}
+.sub{font-size:.9rem;color:var(--ink3);font-weight:300;max-width:420px;margin:0 auto}
+
+/* Screen management */
+.screen{display:none;animation:fadeUp .35s ease both}
+.screen.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Mode toggle */
+.mode-toggle{display:flex;gap:.4rem;margin-bottom:1.5rem;background:var(--cream2);border-radius:100px;padding:4px}
+.mode-btn{flex:1;padding:.55rem .75rem;border:none;border-radius:100px;font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:500;cursor:pointer;background:transparent;color:var(--ink3);transition:all .2s}
+.mode-btn.active{background:var(--white);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.mode-panel{display:none}.mode-panel.active{display:block}
+
+/* Fields */
+.label{font-size:.7rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:.35rem}
+.ing-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.75rem}
+@media(max-width:440px){.ing-grid{grid-template-columns:1fr}}
+.ing-grid input{width:100%;padding:.65rem .85rem;border:1px solid var(--border);border-radius:var(--rs);background:var(--white);font-family:'Outfit',sans-serif;font-size:.9rem;color:var(--ink);outline:none;transition:border-color .15s}
+.ing-grid input:focus{border-color:var(--terra)}
+.ing-grid input::placeholder{color:var(--ink3)}
+.add-btn{width:100%;border:1px dashed var(--border);border-radius:var(--rs);background:none;padding:.55rem;font-family:'Outfit',sans-serif;font-size:.82rem;color:var(--ink3);cursor:pointer;margin-bottom:1rem;transition:all .15s}
+.add-btn:hover{border-color:var(--terra);color:var(--terra)}
+.recipe-input{width:100%;padding:.75rem .85rem;border:1px solid var(--border);border-radius:var(--rs);background:var(--white);font-family:'Outfit',sans-serif;font-size:.9rem;color:var(--ink);outline:none;resize:vertical;min-height:90px;transition:border-color .15s;margin-bottom:.75rem}
+.recipe-input:focus{border-color:var(--terra)}
+
+/* Chips */
+.chips{display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:1.25rem}
+.chip{padding:.38rem .85rem;border:1px solid var(--border);border-radius:100px;background:var(--white);font-family:'Outfit',sans-serif;font-size:.78rem;cursor:pointer;color:var(--ink2);transition:all .15s;user-select:none}
+.chip.on{background:var(--terra-light);border-color:var(--terra);color:var(--terra-dark)}
+
+/* Generate button */
+.gen-btn{width:100%;padding:1rem;background:var(--terra);color:#fff;border:none;border-radius:var(--rs);font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-style:italic;cursor:pointer;transition:background .15s,transform .1s;display:flex;align-items:center;justify-content:center;gap:.5rem}
+.gen-btn:hover{background:var(--terra-dark)}
+.gen-btn:active{transform:scale(.98)}
+.gen-btn:disabled{background:var(--ink3);cursor:not-allowed}
+
+/* Loading */
+#loading{display:none;text-align:center;padding:3.5rem 1rem}
+.spinner{width:32px;height:32px;border:2px solid var(--cream3);border-top-color:var(--terra);border-radius:50%;animation:spin .9s linear infinite;margin:0 auto 1rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-txt{font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--ink3);font-size:1.05rem}
+
+/* Result */
+.recipe-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:2rem;margin-bottom:1.25rem}
+.recipe-name{font-family:'Cormorant Garamond',serif;font-size:1.9rem;font-weight:600;line-height:1.15;color:var(--ink);margin-bottom:.25rem}
+.recipe-meta{font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:1.5rem}
+.sec-head{font-size:.68rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--terra);margin-bottom:.6rem;padding-bottom:.35rem;border-bottom:1px solid var(--terra-light)}
+.ing-list{list-style:none;margin-bottom:1.5rem}
+.ing-list li{padding:.38rem 0;border-bottom:1px solid var(--cream2);font-size:.88rem;color:var(--ink2);display:flex;gap:.5rem}
+.ing-list li::before{content:"–";color:var(--cream3);flex-shrink:0}
+.steps-list{list-style:none;counter-reset:s;margin-bottom:1.5rem}
+.steps-list li{counter-increment:s;padding:.5rem 0 .5rem 2.25rem;border-bottom:1px solid var(--cream2);font-size:.88rem;color:var(--ink2);position:relative;line-height:1.55}
+.steps-list li::before{content:counter(s);position:absolute;left:0;top:.5rem;width:1.5rem;height:1.5rem;background:var(--cream2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:500;color:var(--ink3)}
+.tip-block{background:var(--cream);border-left:3px solid var(--terra);padding:.7rem 1rem;border-radius:0 var(--rs) var(--rs) 0;margin-bottom:.6rem}
+.tip-block strong{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--terra);margin-bottom:.2rem}
+.tip-block p{font-size:.88rem;color:var(--ink2);line-height:1.55}
+.again-btn{width:100%;padding:.75rem;background:none;border:1px solid var(--border);border-radius:var(--rs);font-family:'Outfit',sans-serif;font-size:.88rem;color:var(--ink3);cursor:pointer;margin-bottom:1.25rem;transition:all .15s}
+.again-btn:hover{border-color:var(--terra);color:var(--terra)}
+
+/* Bottleneck */
+.bq{background:var(--ink);border-radius:var(--r);padding:2rem;color:#fff;margin-bottom:1.25rem}
+.bq-eye{font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:.75rem}
+.bq-q{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-style:italic;line-height:1.35;color:var(--cream);margin-bottom:1.5rem}
+.bq-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.85rem}
+@media(max-width:420px){.bq-grid{grid-template-columns:1fr}}
+.bq-opt{padding:.65rem .9rem;border:1px solid rgba(255,255,255,.15);border-radius:var(--rs);background:rgba(255,255,255,.06);color:rgba(255,255,255,.8);font-family:'Outfit',sans-serif;font-size:.82rem;cursor:pointer;text-align:left;transition:all .15s;line-height:1.3}
+.bq-opt:hover,.bq-opt.sel{border-color:var(--terra);background:rgba(191,90,47,.2);color:#fff}
+.bq-other{width:100%;padding:.65rem .85rem;border:1px solid rgba(255,255,255,.15);border-radius:var(--rs);background:rgba(255,255,255,.06);color:rgba(255,255,255,.85);font-family:'Outfit',sans-serif;font-size:.85rem;outline:none;margin-bottom:1rem;transition:border-color .15s}
+.bq-other:focus{border-color:var(--terra)}
+.bq-other::placeholder{color:rgba(255,255,255,.3)}
+.bq-skip{background:none;border:none;font-family:'Outfit',sans-serif;font-size:.76rem;color:rgba(255,255,255,.3);cursor:pointer;text-decoration:underline;display:block;margin:0 auto}
+.bq-skip:hover{color:rgba(255,255,255,.55)}
+
+/* Email */
+.email-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:2rem;text-align:center}
+.email-icon{font-size:2rem;margin-bottom:.85rem}
+.email-title{font-family:'Cormorant Garamond',serif;font-size:1.55rem;font-weight:600;margin-bottom:.45rem}
+.email-sub{font-size:.86rem;color:var(--ink3);font-weight:300;margin-bottom:1.5rem;line-height:1.55}
+.email-fields{display:flex;flex-direction:column;gap:.6rem;margin-bottom:.75rem}
+.email-fields input{width:100%;padding:.7rem .9rem;border:1px solid var(--border);border-radius:var(--rs);font-family:'Outfit',sans-serif;font-size:.9rem;color:var(--ink);background:var(--cream);outline:none;transition:border-color .15s}
+.email-fields input:focus{border-color:var(--terra);background:#fff}
+.email-fields input::placeholder{color:var(--ink3)}
+.sub-btn{width:100%;padding:.8rem;background:var(--terra);color:#fff;border:none;border-radius:var(--rs);font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-style:italic;cursor:pointer;transition:background .15s}
+.sub-btn:hover{background:var(--terra-dark)}
+.sub-btn:disabled{background:var(--ink3);cursor:not-allowed}
+.privacy{font-size:.72rem;color:var(--ink3);margin-top:.6rem}
+
+/* Thanks */
+.thanks{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:2.5rem;text-align:center}
+.thanks-icon{font-size:2.5rem;margin-bottom:1rem}
+.thanks-title{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:600;margin-bottom:.5rem}
+.thanks-sub{font-size:.87rem;color:var(--ink3);font-weight:300;max-width:360px;margin:0 auto 1.5rem;line-height:1.55}
+.share-row{display:flex;justify-content:center;gap:.65rem;flex-wrap:wrap}
+.share-btn{padding:.5rem 1rem;border:1px solid var(--border);border-radius:100px;background:none;font-family:'Outfit',sans-serif;font-size:.8rem;color:var(--ink2);cursor:pointer;transition:all .15s}
+.share-btn:hover{border-color:var(--terra);color:var(--terra)}
+
+/* Error */
+.err{background:#fff3ef;border:1px solid #f5c4a8;border-radius:var(--rs);padding:.7rem 1rem;font-size:.84rem;color:var(--terra-dark);margin-bottom:.85rem;display:none}
+.err.show{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <span class="logo">Forkalgorithm</span>
+    <h1 class="headline">Cook like you've been<br>doing it <em>your whole life</em></h1>
+    <p class="sub">Drop your ingredients or a recipe. Get a pro chef response — free, no signup needed to start.</p>
+  </header>
+
+  <!-- SCREEN 1: INPUT -->
+  <div id="s-input" class="screen active">
+    <div class="mode-toggle">
+      <button class="mode-btn active" onclick="setMode('gen')">Generate a recipe</button>
+      <button class="mode-btn" onclick="setMode('tips')">Get pro chef tips</button>
+    </div>
+
+    <div id="mode-gen" class="mode-panel active">
+      <label class="label">Your ingredients — add up to 6</label>
+      <div class="ing-grid" id="ing-grid">
+        <input type="text" placeholder="e.g. chicken thighs" maxlength="40"/>
+        <input type="text" placeholder="e.g. garlic" maxlength="40"/>
+        <input type="text" placeholder="e.g. lemon" maxlength="40"/>
+        <input type="text" placeholder="e.g. olive oil" maxlength="40"/>
+      </div>
+      <button class="add-btn" onclick="addIng()">+ Add another ingredient</button>
+      <label class="label">Cuisine style (optional)</label>
+      <div class="chips" id="cuisine-chips">
+        <span class="chip" onclick="pickCuisine(this,'Mediterranean')">Mediterranean</span>
+        <span class="chip" onclick="pickCuisine(this,'Asian fusion')">Asian fusion</span>
+        <span class="chip" onclick="pickCuisine(this,'Soul food')">Soul food</span>
+        <span class="chip" onclick="pickCuisine(this,'Latin')">Latin</span>
+        <span class="chip" onclick="pickCuisine(this,'Italian')">Italian</span>
+        <span class="chip" onclick="pickCuisine(this,'Surprise me')">Surprise me</span>
+      </div>
+    </div>
+
+    <div id="mode-tips" class="mode-panel">
+      <label class="label">Your recipe</label>
+      <textarea class="recipe-input" id="recipe-txt" placeholder="e.g. Chicken piccata with lemon butter sauce, capers, and garlic…"></textarea>
+      <label class="label">What do you need help with? (optional)</label>
+      <div class="chips">
+        <span class="chip" onclick="toggleTip(this,'knife technique')">Knife technique</span>
+        <span class="chip" onclick="toggleTip(this,'timing & heat')">Timing & heat</span>
+        <span class="chip" onclick="toggleTip(this,'plating')">Plating</span>
+        <span class="chip" onclick="toggleTip(this,'flavor balance')">Flavor balance</span>
+        <span class="chip" onclick="toggleTip(this,'common mistakes')">Common mistakes</span>
+      </div>
+    </div>
+
+    <div class="err" id="err">Please add at least one ingredient or recipe to get started.</div>
+    <button class="gen-btn" id="gen-btn" onclick="generate()">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3l14 9-14 9V3z"/></svg>
+      Generate my chef response
+    </button>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <p class="loading-txt" id="ltxt">Your chef is thinking…</p>
+  </div>
+
+  <!-- SCREEN 2: RESULT -->
+  <div id="s-result" class="screen">
+    <div class="recipe-card" id="result-card"></div>
+    <button class="again-btn" onclick="reset()">← Try a different recipe</button>
+    <div class="bq">
+      <p class="bq-eye">One quick question</p>
+      <p class="bq-q">"What's the one thing that keeps you from cooking with confidence?"</p>
+      <div class="bq-grid">
+        <button class="bq-opt" onclick="pickBQ(this,'I don\'t know enough techniques')">I don't know enough techniques</button>
+        <button class="bq-opt" onclick="pickBQ(this,'I waste ingredients or mess up recipes')">I waste ingredients or mess up recipes</button>
+        <button class="bq-opt" onclick="pickBQ(this,'I run out of ideas or get bored')">I run out of ideas or get bored</button>
+        <button class="bq-opt" onclick="pickBQ(this,'I don\'t have time to plan')">I don't have time to plan</button>
+        <button class="bq-opt" onclick="pickBQ(this,'I second-guess myself mid-cook')">I second-guess myself mid-cook</button>
+        <button class="bq-opt" onclick="pickBQ(this,'Something else')">Something else</button>
+      </div>
+      <input class="bq-other" id="bq-other" type="text" placeholder="Tell us in your own words…" style="display:none" oninput="bqOtherInput(this)"/>
+      <button class="bq-skip" onclick="showEmail()">skip this →</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: EMAIL -->
+  <div id="s-email" class="screen">
+    <div class="email-card">
+      <div class="email-icon">🍴</div>
+      <h2 class="email-title">Get more like this — free</h2>
+      <p class="email-sub">Weekly AI recipes, chef techniques, and kitchen confidence tips. No spam. Unsubscribe any time.</p>
+      <div class="email-fields">
+        <input type="text" id="fname" placeholder="First name" autocomplete="given-name"/>
+        <input type="email" id="femail" placeholder="Email address" autocomplete="email"/>
+      </div>
+      <button class="sub-btn" id="sub-btn" onclick="subscribe()">Join free</button>
+      <p class="privacy">No spam, ever. Your info stays with Forkalgorithm only.</p>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: THANKS -->
+  <div id="s-thanks" class="screen">
+    <div class="thanks">
+      <div class="thanks-icon">🎉</div>
+      <h2 class="thanks-title">You're in, <span id="tname">chef</span>.</h2>
+      <p class="thanks-sub">Welcome to Forkalgorithm. Check your inbox — your first weekly drop is on its way. Know a home cook who'd love this? Send them the link.</p>
+      <div class="share-row">
+        <button class="share-btn" onclick="copyLink()">📋 Copy link</button>
+        <button class="share-btn" onclick="pinIt()">📌 Pin it</button>
+        <button class="share-btn" onclick="reset()">🍳 Try another recipe</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+// ── CONFIG — replace with your Cloudflare Worker URL after deploying ──
+const WORKER_URL = "YOUR_CLOUDFLARE_WORKER_URL_HERE";
+
+// ── State ──
+let mode = "gen", cuisine = "", tips = [], bottleneck = "";
+
+const loadMsgs = [
+  "Your chef is thinking…",
+  "Checking the pantry…",
+  "Building your technique notes…",
+  "Plating the response…"
+];
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll(".mode-btn").forEach((b,i) => b.classList.toggle("active", i === (m==="gen"?0:1)));
+  document.getElementById("mode-gen").classList.toggle("active", m==="gen");
+  document.getElementById("mode-tips").classList.toggle("active", m==="tips");
+}
+
+function pickCuisine(el, val) {
+  document.querySelectorAll("#cuisine-chips .chip").forEach(c => c.classList.remove("on"));
+  el.classList.add("on");
+  cuisine = val;
+}
+
+function toggleTip(el, val) {
+  el.classList.toggle("on");
+  tips = el.classList.contains("on")
+    ? [...tips, val]
+    : tips.filter(t => t !== val);
+}
+
+function addIng() {
+  const g = document.getElementById("ing-grid");
+  if (g.children.length >= 6) return;
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.placeholder = "Another ingredient…";
+  inp.maxLength = 40;
+  g.appendChild(inp);
+}
+
+function getIngs() {
+  return Array.from(document.querySelectorAll("#ing-grid input"))
+    .map(i => i.value.trim()).filter(Boolean);
+}
+
+function show(id) {
+  ["s-input","s-result","s-email","s-thanks"].forEach(s => {
+    const el = document.getElementById(s);
+    el.classList.remove("active");
+    el.style.display = "none";
+  });
+  document.getElementById("loading").style.display = "none";
+  const t = document.getElementById(id);
+  t.style.display = "block";
+  requestAnimationFrame(() => t.classList.add("active"));
+}
+
+async function generate() {
+  const err = document.getElementById("err");
+  err.classList.remove("show");
+  let prompt = "";
+
+  if (mode === "gen") {
+    const ings = getIngs();
+    if (!ings.length) { err.classList.add("show"); return; }
+    prompt = `You are a professional chef and culinary educator. A home cook has these ingredients: ${ings.join(", ")}.${cuisine ? ` They want ${cuisine} style.` : ""}
+Create a delicious, achievable recipe. Respond ONLY in this exact JSON format, no extra text:
+{"name":"Recipe name","time":"Total time","servings":"Serves X","ingredients":["amount + ingredient"],"steps":["step 1","step 2"],"tips":[{"title":"Pro Tip label","body":"tip text"},{"title":"Chef's Secret","body":"tip text"},{"title":"Common Mistake to Avoid","body":"tip text"}]}`;
+  } else {
+    const recipe = document.getElementById("recipe-txt").value.trim();
+    if (!recipe) { err.classList.add("show"); return; }
+    const focus = tips.length ? tips.join(", ") : "overall execution";
+    prompt = `You are a professional chef and culinary educator. A home cook is making: "${recipe}". Focus on: ${focus}.
+Give expert guidance. Respond ONLY in this exact JSON format:
+{"name":"Recipe name","time":"Approx time","servings":"Typical serving","ingredients":[],"steps":["key step 1","key step 2","key step 3"],"tips":[{"title":"Pro Tip","body":"tip text"},{"title":"Pro Tip","body":"tip text"},{"title":"Common Mistake","body":"what to avoid"},{"title":"Chef's Secret","body":"insider technique"}]}`;
+  }
+
+  document.getElementById("s-input").classList.remove("active");
+  document.getElementById("s-input").style.display = "none";
+  document.getElementById("loading").style.display = "block";
+  document.getElementById("gen-btn").disabled = true;
+
+  let li = 0;
+  const lt = document.getElementById("ltxt");
+  const rot = setInterval(() => { li=(li+1)%loadMsgs.length; lt.textContent=loadMsgs[li]; }, 1800);
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: prompt }] })
+    });
+    clearInterval(rot);
+    if (!res.ok) throw new Error("API error");
+    const data = await res.json();
+    const raw = data.content?.find(b => b.type === "text")?.text || "";
+    const clean = raw.replace(/```json|```/g, "").trim();
+    const recipe = JSON.parse(clean);
+    renderResult(recipe);
+  } catch(e) {
+    clearInterval(rot);
+    document.getElementById("loading").style.display = "none";
+    show("s-input");
+    document.getElementById("gen-btn").disabled = false;
+    err.textContent = "Something went wrong — please try again in a moment.";
+    err.classList.add("show");
+  }
+}
+
+function renderResult(r) {
+  const ingsHTML = r.ingredients?.length
+    ? `<p class="sec-head">Ingredients</p><ul class="ing-list">${r.ingredients.map(i=>`<li>${i}</li>`).join("")}</ul>`
+    : "";
+  const stepsHTML = r.steps?.length
+    ? `<p class="sec-head">${mode==="tips"?"How to nail it":"Method"}</p><ol class="steps-list">${r.steps.map(s=>`<li>${s}</li>`).join("")}</ol>`
+    : "";
+  const tipsHTML = r.tips?.map(t=>`<div class="tip-block"><strong>${t.title}</strong><p>${t.body}</p></div>`).join("") || "";
+
+  document.getElementById("result-card").innerHTML = `
+    <h2 class="recipe-name">${r.name}</h2>
+    <p class="recipe-meta">${r.time||""}${r.servings?" · "+r.servings:""}</p>
+    ${ingsHTML}${stepsHTML}
+    <p class="sec-head">Chef's notes</p>${tipsHTML}
+  `;
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("gen-btn").disabled = false;
+  show("s-result");
+}
+
+function pickBQ(btn, val) {
+  document.querySelectorAll(".bq-opt").forEach(b => b.classList.remove("sel"));
+  btn.classList.add("sel");
+  bottleneck = val;
+  const ot = document.getElementById("bq-other");
+  if (val === "Something else") {
+    ot.style.display = "block";
+    ot.focus();
+  } else {
+    ot.style.display = "none";
+    setTimeout(showEmail, 500);
+  }
+}
+
+function bqOtherInput(el) {
+  bottleneck = el.value;
+}
+
+function showEmail() {
+  const ov = document.getElementById("bq-other").value.trim();
+  if (ov) bottleneck = ov;
+  show("s-email");
+}
+
+async function subscribe() {
+  const fname = document.getElementById("fname").value.trim();
+  const email = document.getElementById("femail").value.trim();
+  if (!email || !email.includes("@")) {
+    document.getElementById("femail").focus();
+    return;
+  }
+  const btn = document.getElementById("sub-btn");
+  btn.disabled = true;
+  btn.textContent = "Joining…";
+
+  try {
+    // When your Mailchimp endpoint is ready, uncomment and replace:
+    // await fetch("YOUR_MAILCHIMP_PROXY_URL", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({ fname, email, bottleneck })
+    // });
+    await new Promise(r => setTimeout(r, 800));
+    document.getElementById("tname").textContent = fname || "chef";
+    show("s-thanks");
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = "Join free";
+  }
+}
+
+function reset() {
+  bottleneck = ""; cuisine = ""; tips = [];
+  document.querySelectorAll(".bq-opt").forEach(b => b.classList.remove("sel"));
+  document.getElementById("bq-other").style.display = "none";
+  document.getElementById("bq-other").value = "";
+  document.querySelectorAll(".chip").forEach(c => c.classList.remove("on"));
+  document.getElementById("fname").value = "";
+  document.getElementById("femail").value = "";
+  document.getElementById("err").classList.remove("show");
+  show("s-input");
+}
+
+function copyLink() {
+  navigator.clipboard.writeText("https://forkalgorithm.com")
+    .then(() => alert("Link copied!"));
+}
+
+function pinIt() {
+  const url = encodeURIComponent("https://forkalgorithm.com");
+  const desc = encodeURIComponent("Free AI chef tool — drop your ingredients and get a pro recipe + chef tips instantly.");
+  window.open(`https://pinterest.com/pin/create/button/?url=${url}&description=${desc}`, "_blank");
+}
+</script>
+</body>
+</html>

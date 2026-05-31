@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fork Algorithm — Recipe Intelligence</title>
+  <meta name="description" content="Turn ingredients into easy recipes with Fork Algorithm's AI-powered recipe assistant. Generate meals, save ideas, and join the launch list." />
+  <meta property="og:title" content="Fork Algorithm — Recipe Intelligence" />
+  <meta property="og:description" content="Turn ingredients into easy recipes with Fork Algorithm's AI-powered recipe assistant. Generate meals, save ideas, and join the launch list." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">Fork Algorithm</div>
+      <div class="beta">Beta</div>
+    </div>
+    <h1>Smart recipes for any ingredients.</h1>
+    <p>Enter what you have, and our AI recipe assistant will build a complete meal plan with prep time, ingredients, and step-by-step instructions.</p>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="hero-card hero-card--left">
+        <span>Ingredients</span>
+      </div>
+      <div class="hero-card hero-card--right">
+        <span>Recipe</span>
+      </div>
+      <div class="hero-icon">🍴</div>
+    </div>
+    <a href="#recipe" class="cta">Try it now</a>
+  </header>
+
+  <main>
+    <section class="features">
+      <article>
+        <h2>Generate recipes instantly</h2>
+        <p>Use ingredients on hand or a dish name and get a polished recipe in seconds.</p>
+      </article>
+      <article>
+        <h2>Save time, eat better</h2>
+        <p>Stop searching through dozens of pages—get a clear recipe with prep time, cook time, and servings.</p>
+      </article>
+      <article>
+        <h2>Join our launch list</h2>
+        <p>Subscribe for updates, new features, and recipe collections from Fork Algorithm.</p>
+      </article>
+    </section>
+
+    <section class="split" id="recipe">
+      <div class="panel">
+        <h2>Recipe assistant</h2>
+        <form id="recipe-form" class="panel-form">
+          <label for="query">Dish or ingredients</label>
+          <input type="text" id="query" placeholder="e.g. garlic shrimp pasta" autocomplete="off" required />
+          <button type="submit">Generate recipe</button>
+          <p class="hint">Press Ctrl+Enter or Cmd+Enter to submit.</p>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>Subscribe for updates</h2>
+        <form id="subscribe-form" class="panel-form">
+          <label for="email">Email address</label>
+          <input type="email" id="email" placeholder="you@example.com" autocomplete="email" required />
+          <button type="submit">Join waitlist</button>
+          <p class="hint">We only send launch updates and recipe feature news.</p>
+        </form>
+      </div>
+    </section>
+
+    <section class="result-card" id="result" hidden>
+      <div id="loading" hidden>Fetching recipe...</div>
+      <pre id="recipe-text"></pre>
+      <p id="error-text" class="error"></p>
+    </section>
+
+    <section class="why-us">
+      <h2>Why Fork Algorithm?</h2>
+      <div class="why-grid">
+        <div class="why-card">
+          <h3>Intelligent recipe creation</h3>
+          <p>Our AI builds complete recipes from your ingredients, not just suggestions.</p>
+        </div>
+        <div class="why-card">
+          <h3>Rapid meal inspiration</h3>
+          <p>Generate new ideas instantly and stop wasting time scrolling through search results.</p>
+        </div>
+        <div class="why-card">
+          <h3>Better than generic recipes</h3>
+          <p>Each result is formatted with prep time, cook time, servings, and clear steps.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="social-proof">
+      <h2>Designed for home cooks</h2>
+      <p>Fork Algorithm helps you transform pantry ingredients into something delicious</p>
+      <div class="metrics">
+        <div><strong>AI-powered</strong><span>Recipe generation</span></div>
+        <div><strong>Fast</strong><span>Instant results</span></div>
+        <div><strong>Simple</strong><span>No setup needed</span></div>
+      </div>
+    </section>
+
+    <section class="faq">
+      <h2>Frequently asked questions</h2>
+      <div class="faq-item">
+        <h3>How does the recipe assistant work?</h3>
+        <p>It sends your ingredients or dish name to an intelligent model that returns a clean recipe with steps, prep time, and servings.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Is my email address safe?</h3>
+        <p>Yes. We only use your email for launch updates and product announcements. No spam.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Can I try more than one recipe?</h3>
+        <p>Absolutely. Generate as many recipes as you want from the same page.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Fork Algorithm — launch-ready recipe assistant.</p>
+  </footer>
+
+  <div class="modal" id="confirmation-modal" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">You're in!</h2>
+      <p>Thanks for subscribing. We'll notify you when Fork Algorithm launches and share the latest recipe updates.</p>
+      <button id="modal-close" type="button">Close</button>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

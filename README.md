@@ -34,6 +34,49 @@ pip install -r requirements.txt
 gunicorn app:app --bind 0.0.0.0:$PORT
 ```
 
+### Docker
+
+Build the container locally:
+
+```bash
+docker build -t forkalgorithm:latest .
+```
+
+Run it locally:
+
+```bash
+docker run -p 5000:5000 forkalgorithm:latest
+```
+
+### With Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Open `http://127.0.0.1:5000` in your browser.
+
+Stop the local stack with:
+
+```bash
+docker compose down
+```
+
+### Environment variables
+
+For local Docker use, you can pass environment values with a `.env` file or `docker compose` overrides. Example `.env`:
+
+```env
+MINIMAX_API_KEY=your_api_key_here
+FLASK_ENV=production
+```
+
+Then run:
+
+```bash
+docker compose up --build
+```
+
 ### Railway / Fly.io / Heroku
 
 Use the same build/start commands above.

@@ -29,6 +29,6 @@ jobs:
       - name: Run a quick import check
         run: |
           python -c "import flask, requests"
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
-          pytest -q
+          pytest --cov=app --cov-report=term-missing -q

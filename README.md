@@ -18,8 +18,11 @@ Install dependencies and run:
 
 ```bash
 pip install -r requirements.txt
-pytest -q
+pytest --cov=app --cov-report=term-missing -q
 ```
+
+This will show coverage information in the test output.
+
 ## Deployment
 
 This app is ready to deploy to most Python hosting platforms.

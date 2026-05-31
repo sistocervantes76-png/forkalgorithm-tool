@@ -29,3 +29,6 @@ jobs:
       - name: Run a quick import check
         run: |
           python -c "import flask, requests"
+      - name: Run tests
+        run: |
+          pytest -q

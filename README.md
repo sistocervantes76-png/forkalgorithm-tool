@@ -12,7 +12,14 @@ python app.py
 ```
 
 Then open `http://127.0.0.1:5000`.
+## Run tests
 
+Install dependencies and run:
+
+```bash
+pip install -r requirements.txt
+pytest -q
+```
 ## Deployment
 
 This app is ready to deploy to most Python hosting platforms.

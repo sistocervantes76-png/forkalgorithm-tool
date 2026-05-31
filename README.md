@@ -49,3 +49,8 @@ git push -u origin master
 ```
 
 Once the repo exists, you can connect it to any cloud hosting service.
+
+## Continuous integration
+
+This repository includes a GitHub Actions workflow at `.github/workflows/python-ci.yml`.
+It installs dependencies, checks Python syntax, and verifies Flask / requests imports on every push and pull request.

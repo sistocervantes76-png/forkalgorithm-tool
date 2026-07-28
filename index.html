@@ -65,6 +65,9 @@ body{font-family:'Outfit',sans-serif;background:#d4c4a8;color:var(--ink);min-hei
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-txt{font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--ink3);font-size:1.05rem}
 
+/* Input form */
+.form-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:2rem}
+
 /* Result */
 .recipe-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:2rem;margin-bottom:1.25rem}
 .recipe-name{font-family:'Cormorant Garamond',serif;font-size:1.9rem;font-weight:600;line-height:1.15;color:var(--ink);margin-bottom:.25rem}
@@ -135,49 +138,51 @@ body{font-family:'Outfit',sans-serif;background:#d4c4a8;color:var(--ink);min-hei
 
   <!-- SCREEN 1: INPUT -->
   <div id="s-input" class="screen active">
-    <div class="mode-toggle">
-      <button class="mode-btn active" onclick="setMode('gen')">Generate a recipe</button>
-      <button class="mode-btn" onclick="setMode('tips')">Get pro chef tips</button>
-    </div>
-
-    <div id="mode-gen" class="mode-panel active">
-      <label class="label">Your ingredients — add up to 6</label>
-      <div class="ing-grid" id="ing-grid">
-        <input type="text" placeholder="e.g. chicken thighs" maxlength="40"/>
-        <input type="text" placeholder="e.g. garlic" maxlength="40"/>
-        <input type="text" placeholder="e.g. lemon" maxlength="40"/>
-        <input type="text" placeholder="e.g. olive oil" maxlength="40"/>
+    <div class="form-card">
+      <div class="mode-toggle">
+        <button class="mode-btn active" onclick="setMode('gen')">Generate a recipe</button>
+        <button class="mode-btn" onclick="setMode('tips')">Get pro chef tips</button>
       </div>
-      <button class="add-btn" onclick="addIng()">+ Add another ingredient</button>
-      <label class="label">Cuisine style (optional)</label>
-      <div class="chips" id="cuisine-chips">
-        <span class="chip" onclick="pickCuisine(this,'Mediterranean')">Mediterranean</span>
-        <span class="chip" onclick="pickCuisine(this,'Asian fusion')">Asian fusion</span>
-        <span class="chip" onclick="pickCuisine(this,'Soul food')">Soul food</span>
-        <span class="chip" onclick="pickCuisine(this,'Latin')">Latin</span>
-        <span class="chip" onclick="pickCuisine(this,'Italian')">Italian</span>
-        <span class="chip" onclick="pickCuisine(this,'Surprise me')">Surprise me</span>
-      </div>
-    </div>
 
-    <div id="mode-tips" class="mode-panel">
-      <label class="label">Your recipe</label>
-      <textarea class="recipe-input" id="recipe-txt" placeholder="e.g. Chicken piccata with lemon butter sauce, capers, and garlic…"></textarea>
-      <label class="label">What do you need help with? (optional)</label>
-      <div class="chips">
-        <span class="chip" onclick="toggleTip(this,'knife technique')">Knife technique</span>
-        <span class="chip" onclick="toggleTip(this,'timing & heat')">Timing & heat</span>
-        <span class="chip" onclick="toggleTip(this,'plating')">Plating</span>
-        <span class="chip" onclick="toggleTip(this,'flavor balance')">Flavor balance</span>
-        <span class="chip" onclick="toggleTip(this,'common mistakes')">Common mistakes</span>
+      <div id="mode-gen" class="mode-panel active">
+        <label class="label">Your ingredients — add up to 6</label>
+        <div class="ing-grid" id="ing-grid">
+          <input type="text" placeholder="e.g. chicken thighs" maxlength="40"/>
+          <input type="text" placeholder="e.g. garlic" maxlength="40"/>
+          <input type="text" placeholder="e.g. lemon" maxlength="40"/>
+          <input type="text" placeholder="e.g. olive oil" maxlength="40"/>
+        </div>
+        <button class="add-btn" onclick="addIng()">+ Add another ingredient</button>
+        <label class="label">Cuisine style (optional)</label>
+        <div class="chips" id="cuisine-chips">
+          <span class="chip" onclick="pickCuisine(this,'Mediterranean')">Mediterranean</span>
+          <span class="chip" onclick="pickCuisine(this,'Asian fusion')">Asian fusion</span>
+          <span class="chip" onclick="pickCuisine(this,'Soul food')">Soul food</span>
+          <span class="chip" onclick="pickCuisine(this,'Latin')">Latin</span>
+          <span class="chip" onclick="pickCuisine(this,'Italian')">Italian</span>
+          <span class="chip" onclick="pickCuisine(this,'Surprise me')">Surprise me</span>
+        </div>
       </div>
-    </div>
 
-    <div class="err" id="err">Please add at least one ingredient or recipe to get started.</div>
-    <button class="gen-btn" id="gen-btn" onclick="generate()">
-      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3l14 9-14 9V3z"/></svg>
-      Generate my chef response
-    </button>
+      <div id="mode-tips" class="mode-panel">
+        <label class="label">Your recipe</label>
+        <textarea class="recipe-input" id="recipe-txt" placeholder="e.g. Chicken piccata with lemon butter sauce, capers, and garlic…"></textarea>
+        <label class="label">What do you need help with? (optional)</label>
+        <div class="chips">
+          <span class="chip" onclick="toggleTip(this,'knife technique')">Knife technique</span>
+          <span class="chip" onclick="toggleTip(this,'timing & heat')">Timing & heat</span>
+          <span class="chip" onclick="toggleTip(this,'plating')">Plating</span>
+          <span class="chip" onclick="toggleTip(this,'flavor balance')">Flavor balance</span>
+          <span class="chip" onclick="toggleTip(this,'common mistakes')">Common mistakes</span>
+        </div>
+      </div>
+
+      <div class="err" id="err">Please add at least one ingredient or recipe to get started.</div>
+      <button class="gen-btn" id="gen-btn" onclick="generate()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3l14 9-14 9V3z"/></svg>
+        Generate my chef response
+      </button>
+    </div>
   </div>
 
   <!-- LOADING -->

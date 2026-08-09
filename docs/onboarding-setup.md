@@ -9,6 +9,20 @@ Two pages, two steps of the same journey.
 
 `start.html` links to `onboarding.html` at the bottom, so the whole thing runs front to back.
 
+## Two ways to collect onboarding
+
+There are two routes into the same place. Use whichever suits the client.
+
+| Route | Setup needed | Use it when |
+|---|---|---|
+| **Google Form** — see `docs/google-form-setup.md` | About 5 minutes, no webhook | You want to onboard someone today, or the client would rather use a form they recognise |
+| **`onboarding.html`** — this document | Needs the Make scenario below | You want the agreement signed in the same sitting |
+
+Both write one row per client to an **`Onboarding`** tab with identical columns, so you read one
+place either way. The `intake_source` column tells you which route they came through. The
+agreement and signature columns stay blank for Google Form submissions — that form is intake
+only, and signing happens separately.
+
 ---
 
 ## What you need before you start
@@ -32,7 +46,7 @@ form_type	submission_id	submitted_at	first_name	business_name	mobile	mobile_e164
 **Tab 2, name it `Onboarding`** — paste this into row 1:
 
 ```
-submission_id	submitted_at	legal_business_name	display_name	business_type	website	service_area	timezone	main_business_number	current_phone_provider	who_answers_now	alert_sms_numbers	alert_emails	business_hours	after_hours_message	services	services_count	qualification_questions	custom_question	pricing_policy	approved_price_ranges	never_say	minimum_job_size	jobs_not_accepted	offers_recurring	escalation_contact_name	escalation_contact_phone	urgent_triggers	backup_contact	lead_outcome	existing_crm	lead_destination	google_business_profile_url	facebook_url	instagram_url	logo_url	brand_tone	missed_calls_per_week	avg_customer_value	current_callback_time	estimated_annual_loss	ein	tier	business_address	authorized_rep_name	authorized_rep_title	authorized_rep_email	target_go_live_date	consent_authorize_sms	consent_info_accurate	agreement_version	agreement_tier	agreement_setup_fee	agreement_monthly_fee	agreement_term_months	agreement_notice_days	agreement_year_one_total	signature_name	signature_title	signature_agreed	consent_case_study	signature_date	user_agent
+submission_id	submitted_at	intake_source	legal_business_name	display_name	business_type	website	service_area	timezone	main_business_number	current_phone_provider	who_answers_now	alert_sms_numbers	alert_emails	business_hours	after_hours_message	services	services_count	qualification_questions	custom_question	pricing_policy	approved_price_ranges	never_say	minimum_job_size	jobs_not_accepted	offers_recurring	escalation_contact_name	escalation_contact_phone	urgent_triggers	backup_contact	lead_outcome	existing_crm	lead_destination	google_business_profile_url	facebook_url	instagram_url	logo_url	brand_tone	missed_calls_per_week	avg_customer_value	current_callback_time	estimated_annual_loss	ein	tier	business_address	authorized_rep_name	authorized_rep_title	authorized_rep_email	target_go_live_date	consent_authorize_sms	consent_info_accurate	agreement_version	agreement_tier	agreement_setup_fee	agreement_monthly_fee	agreement_term_months	agreement_notice_days	agreement_year_one_total	signature_name	signature_title	signature_agreed	consent_case_study	signature_date	user_agent
 ```
 
 Those are tab-separated, so pasting into cell A1 spreads them across the columns automatically.

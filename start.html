@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Fork Algorithm — What's your missed-call leak?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#1a1714;--ink2:#3d3830;--ink3:#7a7168;
+  --cream:#faf6ef;--cream2:#f2ebe0;--cream3:#e8dece;
+  --terra:#bf5a2f;--terra-light:#f0d5c8;--terra-dark:#8c3e1c;
+  --white:#ffffff;--border:#dfd6ca;--r:10px;--rs:6px;
+}
+html{font-size:16px}
+body{font-family:'Outfit',sans-serif;background:#d4c4a8;color:var(--ink);min-height:100vh;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:680px;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+
+.top{text-align:center;padding-bottom:2rem;border-bottom:1px solid var(--border);margin-bottom:2rem}
+.logo{font-family:'Cormorant Garamond',serif;font-size:.85rem;letter-spacing:.25em;text-transform:uppercase;color:var(--terra);margin-bottom:1.25rem;display:block}
+.headline{font-family:'Cormorant Garamond',serif;font-size:clamp(1.9rem,5vw,2.9rem);line-height:1.1;font-weight:600;margin-bottom:.75rem}
+.headline em{font-style:italic;color:var(--terra)}
+.sub{font-size:.9rem;color:var(--ink3);font-weight:300;max-width:440px;margin:0 auto}
+
+.screen{display:none;animation:fadeUp .35s ease both}
+.screen.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.form-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:2rem;margin-bottom:1.25rem}
+@media(max-width:440px){.form-card{padding:1.4rem}}
+
+.q{margin-bottom:1.6rem}
+.q:last-of-type{margin-bottom:1.2rem}
+.q-num{font-size:.66rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--terra);display:block;margin-bottom:.3rem}
+.q-txt{font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-style:italic;line-height:1.35;color:var(--ink);margin-bottom:.75rem}
+.q-hint{font-size:.76rem;color:var(--ink3);font-weight:300;margin-top:.4rem}
+
+.chips{display:flex;flex-wrap:wrap;gap:.45rem}
+.chip{padding:.45rem .95rem;border:1px solid var(--border);border-radius:100px;background:var(--white);font-family:'Outfit',sans-serif;font-size:.8rem;cursor:pointer;color:var(--ink2);transition:all .15s;user-select:none}
+.chip:hover{border-color:var(--terra)}
+.chip.on{background:var(--terra-light);border-color:var(--terra);color:var(--terra-dark)}
+.chips.bad{outline:1px solid #d9694a;outline-offset:5px;border-radius:var(--rs)}
+
+.label{font-size:.7rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:.35rem}
+.label .req{color:var(--terra)}
+input[type=text],input[type=tel],input[type=email]{width:100%;padding:.65rem .85rem;border:1px solid var(--border);border-radius:var(--rs);background:var(--white);font-family:'Outfit',sans-serif;font-size:.9rem;color:var(--ink);outline:none;transition:border-color .15s}
+input:focus{border-color:var(--terra)}
+input::placeholder{color:var(--ink3)}
+input.bad{border-color:#d9694a;background:#fff8f5}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.6rem}
+@media(max-width:480px){.two{grid-template-columns:1fr}}
+
+.contact-block{border-top:1px solid var(--cream2);padding-top:1.5rem;margin-top:.5rem}
+.check{display:flex;align-items:flex-start;gap:.6rem;padding:.6rem 0 0;cursor:pointer;font-size:.82rem;color:var(--ink2);line-height:1.45}
+.check input{width:16px;height:16px;margin-top:.2rem;accent-color:var(--terra);flex-shrink:0;cursor:pointer}
+.check.bad span{color:var(--terra-dark)}
+.fine{font-size:.72rem;color:var(--ink3);font-weight:300;margin-top:.5rem;line-height:1.45}
+
+.go-btn{width:100%;padding:1rem;background:var(--terra);color:#fff;border:none;border-radius:var(--rs);font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-style:italic;cursor:pointer;transition:background .15s,transform .1s;display:flex;align-items:center;justify-content:center;gap:.5rem}
+.go-btn:hover{background:var(--terra-dark)}
+.go-btn:active{transform:scale(.99)}
+.go-btn:disabled{background:var(--ink3);cursor:not-allowed}
+
+.err{background:#fff3ef;border:1px solid #f5c4a8;border-radius:var(--rs);padding:.7rem 1rem;font-size:.84rem;color:var(--terra-dark);margin-bottom:.85rem;display:none}
+.err.show{display:block}
+
+/* Report */
+.leak{background:var(--ink);border-radius:var(--r);padding:2rem;color:#fff;margin-bottom:1.25rem}
+@media(max-width:440px){.leak{padding:1.5rem}}
+.leak-eye{font-size:.66rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:.6rem}
+.leak-big{font-family:'Cormorant Garamond',serif;font-size:clamp(2.2rem,9vw,3.4rem);line-height:1;color:var(--terra-light);font-weight:600;margin-bottom:.3rem}
+.leak-cap{font-size:.86rem;color:rgba(255,255,255,.65);font-weight:300;line-height:1.5;margin-bottom:1.4rem}
+.leak-math{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+@media(max-width:440px){.leak-math{grid-template-columns:1fr}}
+.leak-cell{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--rs);padding:.7rem .85rem}
+.leak-cell b{display:block;font-size:1.15rem;font-weight:500;color:#fff;line-height:1.2}
+.leak-cell span{font-size:.7rem;color:rgba(255,255,255,.45);letter-spacing:.04em}
+.leak-note{font-size:.72rem;color:rgba(255,255,255,.35);margin-top:1rem;line-height:1.45}
+
+.opts-head{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;margin-bottom:.3rem}
+.opts-note{font-size:.85rem;color:var(--ink3);font-weight:300;margin-bottom:1.25rem;line-height:1.5}
+.opt{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:1.5rem;margin-bottom:.85rem;position:relative}
+.opt.pick{border-color:var(--terra);box-shadow:0 0 0 1px var(--terra)}
+.opt-tag{position:absolute;top:-9px;left:1.5rem;background:var(--terra);color:#fff;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;padding:.2rem .6rem;border-radius:100px}
+.opt-name{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:600;margin-bottom:.15rem}
+.opt-for{font-size:.8rem;color:var(--ink3);font-weight:300;margin-bottom:.9rem}
+.opt-price{display:flex;align-items:baseline;gap:.5rem;padding-bottom:.85rem;margin-bottom:.85rem;border-bottom:1px solid var(--cream2)}
+.opt-price b{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;color:var(--terra)}
+.opt-price span{font-size:.8rem;color:var(--ink3)}
+.opt-list{list-style:none}
+.opt-list li{font-size:.84rem;color:var(--ink2);line-height:1.5;padding:.22rem 0 .22rem 1.15rem;position:relative}
+.opt-list li::before{content:"–";position:absolute;left:0;color:var(--cream3)}
+.opt-be{margin-top:.9rem;padding:.6rem .85rem;background:var(--cream);border-left:3px solid var(--terra);border-radius:0 var(--rs) var(--rs) 0;font-size:.82rem;color:var(--ink2);line-height:1.45}
+
+.cta{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:2rem;text-align:center;margin-top:1.25rem}
+.cta h3{font-family:'Cormorant Garamond',serif;font-size:1.45rem;font-weight:600;margin-bottom:.4rem}
+.cta p{font-size:.86rem;color:var(--ink3);font-weight:300;margin-bottom:1.25rem;line-height:1.55;max-width:400px;margin-left:auto;margin-right:auto}
+.cta-row{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center}
+.cta-btn{padding:.8rem 1.5rem;background:var(--terra);color:#fff;border:none;border-radius:var(--rs);font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-style:italic;cursor:pointer;text-decoration:none;display:inline-block;transition:background .15s}
+.cta-btn:hover{background:var(--terra-dark)}
+.cta-btn.ghost{background:none;border:1px solid var(--border);color:var(--ink2);font-family:'Outfit',sans-serif;font-style:normal;font-size:.86rem;padding:.8rem 1.35rem}
+.cta-btn.ghost:hover{border-color:var(--terra);color:var(--terra);background:none}
+
+.sent{background:var(--terra-light);border:1px solid var(--terra);border-radius:var(--rs);padding:.85rem 1rem;font-size:.85rem;color:var(--terra-dark);margin-bottom:1.25rem;line-height:1.5;display:none}
+.sent.show{display:block}
+
+/* Loading */
+#loading{display:none;text-align:center;padding:3.5rem 1rem}
+.spinner{width:32px;height:32px;border:2px solid var(--cream3);border-top-color:var(--terra);border-radius:50%;animation:spin .9s linear infinite;margin:0 auto 1rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-txt{font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--ink3);font-size:1.05rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <span class="logo">Fork Algorithm</span>
+    <h1 class="headline">What are your <em>missed calls</em> actually costing you?</h1>
+    <p class="sub">Six quick questions. You'll get a straight answer and a couple of options for what we'd build — texted to you so you can look at it later.</p>
+  </header>
+
+  <!-- ══ QUESTIONS ══ -->
+  <div id="s-q" class="screen active">
+    <div class="form-card">
+
+      <div class="q">
+        <span class="q-num">Question 1</span>
+        <p class="q-txt">What kind of business do you run?</p>
+        <div class="chips" data-chips="business_type">
+          <span class="chip" data-val="Restaurant / Food">Restaurant / Food</span>
+          <span class="chip" data-val="Lawn &amp; Landscaping">Lawn &amp; Landscaping</span>
+          <span class="chip" data-val="Contractor / Construction">Contractor / Construction</span>
+          <span class="chip" data-val="HVAC">HVAC</span>
+          <span class="chip" data-val="Plumbing">Plumbing</span>
+          <span class="chip" data-val="Electrical">Electrical</span>
+          <span class="chip" data-val="Roofing">Roofing</span>
+          <span class="chip" data-val="Cleaning">Cleaning</span>
+          <span class="chip" data-val="Pool / Pest / Pressure washing">Pool / Pest / Pressure</span>
+          <span class="chip" data-val="Something else">Something else</span>
+        </div>
+      </div>
+
+      <div class="q">
+        <span class="q-num">Question 2</span>
+        <p class="q-txt">Roughly how many calls slip through in a normal week?</p>
+        <div class="chips" data-chips="missed_band">
+          <span class="chip" data-val="1-5" data-mid="3">1–5</span>
+          <span class="chip" data-val="6-15" data-mid="10">6–15</span>
+          <span class="chip" data-val="16-30" data-mid="22">16–30</span>
+          <span class="chip" data-val="30+" data-mid="40">More than 30</span>
+          <span class="chip" data-val="No idea" data-mid="20">Honestly, no idea</span>
+        </div>
+        <p class="q-hint">A guess is fine. We'd rather use a number you believe than a big one you don't.</p>
+      </div>
+
+      <div class="q">
+        <span class="q-num">Question 3</span>
+        <p class="q-txt">What's a new customer typically worth to you?</p>
+        <div class="chips" data-chips="value_band">
+          <span class="chip" data-val="Under $100" data-mid="60">Under $100</span>
+          <span class="chip" data-val="$100-300" data-mid="200">$100–300</span>
+          <span class="chip" data-val="$300-1,000" data-mid="600">$300–1,000</span>
+          <span class="chip" data-val="$1,000-5,000" data-mid="2500">$1,000–5,000</span>
+          <span class="chip" data-val="Over $5,000" data-mid="7500">Over $5,000</span>
+        </div>
+        <p class="q-hint">First job, or what they're worth over a year if they stick around.</p>
+      </div>
+
+      <div class="q">
+        <span class="q-num">Question 4</span>
+        <p class="q-txt">When someone can't reach you, how fast do they hear back?</p>
+        <div class="chips" data-chips="callback_speed">
+          <span class="chip" data-val="Within minutes">Within minutes</span>
+          <span class="chip" data-val="A few hours">A few hours</span>
+          <span class="chip" data-val="Next day">Next day</span>
+          <span class="chip" data-val="Sometimes never">Honestly, sometimes never</span>
+        </div>
+      </div>
+
+      <div class="q">
+        <span class="q-num">Question 5</span>
+        <p class="q-txt">Where else do people reach out to you?</p>
+        <div class="chips" data-chips="channels" data-multi="true">
+          <span class="chip" data-val="Phone only">Just the phone</span>
+          <span class="chip" data-val="Website form">Website form</span>
+          <span class="chip" data-val="Google Business Profile">Google</span>
+          <span class="chip" data-val="Facebook">Facebook</span>
+          <span class="chip" data-val="Instagram">Instagram</span>
+          <span class="chip" data-val="Text messages">Text</span>
+          <span class="chip" data-val="Walk-ins">Walk-ins</span>
+        </div>
+        <p class="q-hint">Tap as many as apply.</p>
+      </div>
+
+      <div class="q">
+        <span class="q-num">Question 6</span>
+        <p class="q-txt">If this worked perfectly, what would it be doing for you?</p>
+        <div class="chips" data-chips="wants" data-multi="true">
+          <span class="chip" data-val="Answer missed calls instantly">Answer missed calls instantly</span>
+          <span class="chip" data-val="Book jobs automatically">Book jobs for me</span>
+          <span class="chip" data-val="Collect job details and photos">Collect details &amp; photos</span>
+          <span class="chip" data-val="Follow up with quiet leads">Follow up when they go quiet</span>
+          <span class="chip" data-val="Ask for reviews">Ask for reviews</span>
+          <span class="chip" data-val="Show everything in one place">Show it all in one place</span>
+        </div>
+        <p class="q-hint">Tap as many as apply.</p>
+      </div>
+
+      <div class="contact-block">
+        <label class="label">Where should we text your report? <span class="req">*</span></label>
+        <div class="two">
+          <input type="text" data-key="first_name" placeholder="First name"/>
+          <input type="text" data-key="business_name" placeholder="Business name"/>
+        </div>
+        <div class="two">
+          <input type="tel" data-key="mobile" placeholder="Mobile number"/>
+          <input type="email" data-key="email" placeholder="Email (optional)"/>
+        </div>
+        <label class="check">
+          <input type="checkbox" data-key="consent_sms"/>
+          <span>Text me my report at this number. <span class="req">*</span></span>
+        </label>
+        <p class="fine">One text with your report, and a follow-up only if you ask for one. Message and data rates may apply. Reply STOP any time and we're done. We don't sell your information.</p>
+      </div>
+
+      <div class="err" id="err"></div>
+      <button type="button" class="go-btn" id="go-btn">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3l14 9-14 9V3z"/></svg>
+        Show me the number
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ LOADING ══ -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <p class="loading-txt" id="ltxt">Running your numbers…</p>
+  </div>
+
+  <!-- ══ REPORT ══ -->
+  <div id="s-report" class="screen">
+    <div class="sent" id="sent"></div>
+
+    <div class="leak">
+      <p class="leak-eye">What's slipping past you</p>
+      <p class="leak-big" id="leak-annual">$0</p>
+      <p class="leak-cap" id="leak-cap">a year in work that reaches you and doesn't get answered</p>
+      <div class="leak-math">
+        <div class="leak-cell"><b id="m-calls">0</b><span>missed calls / week</span></div>
+        <div class="leak-cell"><b id="m-value">$0</b><span>per new customer</span></div>
+        <div class="leak-cell"><b id="m-week">$0</b><span>slipping per week</span></div>
+      </div>
+      <p class="leak-note" id="leak-note"></p>
+    </div>
+
+    <h2 class="opts-head">Here's what we'd build</h2>
+    <p class="opts-note" id="opts-note">Three ways to fix it. The one marked below is what we'd start you on based on your answers.</p>
+    <div id="opts"></div>
+
+    <div class="cta">
+      <h3>Want to talk it through?</h3>
+      <p>Sisto ran restaurant operations for 20 years before building this. Fifteen minutes on the phone and you'll know whether it's worth doing.</p>
+      <div class="cta-row">
+        <a class="cta-btn" id="call-btn" href="#">Book a 15-minute call</a>
+        <a class="cta-btn ghost" href="onboarding.html">I'm ready — start setup</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+// ── CONFIG ───────────────────────────────────────────────────────────────
+// Paste your Make webhook URL here. The same webhook receives both this
+// report form and the full onboarding form — tell them apart with form_type.
+// See docs/onboarding-setup.md.
+const MAKE_WEBHOOK_URL = "";
+const BOOKING_URL = "";                 // your scheduling link, e.g. Calendly
+const CONTACT_EMAIL = "sistocervantes76@gmail.com";
+
+// Recover this share of missed calls in the estimate. Deliberately low —
+// a number the owner believes beats a big one they don't.
+const RECOVERY_RATE = 0.30;
+
+const TIERS = [
+  { name:"Speed to Lead", setup:2000, monthly:350,
+    who:"One location, you just need the phone to stop leaking.",
+    includes:["Missed-call text-back on your main line","Asks what service they need","Collects the details you need to quote","Texts and emails your team instantly","A simple lead list you can actually see"] },
+  { name:"Growth", setup:2800, monthly:500,
+    who:"Busy shop with leads coming from more than one place.",
+    includes:["Everything in Speed to Lead","Website and social messages handled the same way","Books appointments, not just requests","Asks for photos of the job","Follows up automatically when a lead goes quiet","Connects to your calendar or CRM"] },
+  { name:"Revenue Operations", setup:6000, monthly:800,
+    who:"Multiple locations or high job value, and you want the whole picture.",
+    includes:["Everything in Growth","Every channel you use feeding one pipeline","Estimate reminders so quotes don't die","Reactivates old leads that never closed","Asks for reviews after completed jobs","A dashboard showing what's working","Monthly tuning with Sisto"] }
+];
+
+const $  = id => document.getElementById(id);
+const $$ = s => Array.from(document.querySelectorAll(s));
+
+let picks = {};   // chip group -> value or array
+let mids  = {};   // chip group -> numeric midpoint
+
+const REQUIRED_CHIPS = ["business_type","missed_band","value_band","callback_speed","wants"];
+
+// ── Chips ────────────────────────────────────────────────────────────────
+$$("[data-chips]").forEach(group => {
+  const key = group.dataset.chips;
+  const multi = group.dataset.multi === "true";
+  picks[key] = multi ? [] : "";
+  group.addEventListener("click", e => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    group.classList.remove("bad");
+    if (multi) {
+      chip.classList.toggle("on");
+      picks[key] = Array.from(group.querySelectorAll(".chip.on")).map(c => c.dataset.val);
+    } else {
+      group.querySelectorAll(".chip").forEach(c => c.classList.remove("on"));
+      chip.classList.add("on");
+      picks[key] = chip.dataset.val;
+      if (chip.dataset.mid) mids[key] = Number(chip.dataset.mid);
+    }
+  });
+});
+
+document.addEventListener("input", e => { e.target.classList.remove("bad"); });
+
+// ── Validate ─────────────────────────────────────────────────────────────
+function validate() {
+  $$(".bad").forEach(el => el.classList.remove("bad"));
+  $("err").classList.remove("show");
+  let bad = null;
+
+  REQUIRED_CHIPS.forEach(k => {
+    const v = picks[k];
+    const empty = Array.isArray(v) ? !v.length : !v;
+    if (empty) {
+      const g = document.querySelector(`[data-chips="${k}"]`);
+      g.classList.add("bad");
+      bad = bad || g;
+    }
+  });
+
+  ["first_name","business_name","mobile"].forEach(k => {
+    const el = document.querySelector(`[data-key="${k}"]`);
+    if (!el.value.trim()) { el.classList.add("bad"); bad = bad || el; }
+  });
+
+  const mob = document.querySelector('[data-key="mobile"]');
+  const digits = mob.value.replace(/\D/g, "");
+  if (mob.value.trim() && digits.length < 10) { mob.classList.add("bad"); bad = bad || mob; }
+
+  const consent = document.querySelector('[data-key="consent_sms"]');
+  if (!consent.checked) {
+    consent.closest(".check").classList.add("bad");
+    bad = bad || consent;
+    $("err").textContent = "We need your OK to text the report to you.";
+    $("err").classList.add("show");
+    consent.scrollIntoView({ behavior:"smooth", block:"center" });
+    return false;
+  }
+
+  if (bad) {
+    $("err").textContent = "Just a few blanks left — they're highlighted below.";
+    $("err").classList.add("show");
+    bad.scrollIntoView({ behavior:"smooth", block:"center" });
+    return false;
+  }
+  return true;
+}
+
+// ── The math ─────────────────────────────────────────────────────────────
+function crunch() {
+  const calls = mids.missed_band || 10;
+  const value = mids.value_band || 200;
+  const weekly = calls * value;
+  const annual = weekly * 52;
+  const recovered = Math.round(annual * RECOVERY_RATE);
+  return { calls, value, weekly, annual, recovered };
+}
+
+function recommend() {
+  const w = picks.wants || [];
+  const ch = (picks.channels || []).filter(c => c !== "Phone only");
+  const value = mids.value_band || 200;
+
+  if (w.includes("Ask for reviews") || w.includes("Show everything in one place") || ch.length >= 3 || value >= 2500)
+    return 2;
+  if (w.includes("Book jobs automatically") || w.includes("Follow up with quiet leads") ||
+      w.includes("Collect job details and photos") || ch.length >= 1)
+    return 1;
+  return 0;
+}
+
+const money = n => "$" + Math.round(n).toLocaleString("en-US");
+
+// ── Render the report ────────────────────────────────────────────────────
+function render(n, rec) {
+  $("leak-annual").textContent = money(n.annual);
+  $("m-calls").textContent = n.calls;
+  $("m-value").textContent = money(n.value);
+  $("m-week").textContent = money(n.weekly);
+
+  const speed = picks.callback_speed;
+  const speedLine = speed === "Sometimes never" ? "Right now some of those callers never hear back at all."
+    : speed === "Next day" ? "By the time you call back the next day, most have already booked someone else."
+    : speed === "A few hours" ? "A few hours is enough time for them to call the next company on the list."
+    : "You're already fast — this is about the calls that get past you when you can't be.";
+  $("leak-note").textContent = speedLine +
+    ` Recover even ${Math.round(RECOVERY_RATE * 100)}% of them and that's ${money(n.recovered)} a year back. Estimate based on the numbers you gave us — not a guarantee.`;
+
+  $("opts").innerHTML = TIERS.map((t, i) => {
+    const yearOne = t.setup + t.monthly * 12;
+    const customers = Math.max(1, Math.ceil(yearOne / n.value));
+    const perMonth = (customers / 12);
+    const perMonthTxt = perMonth < 1
+      ? `about ${customers} jobs across the whole year`
+      : `about ${Math.ceil(perMonth)} a month`;
+    return `
+      <div class="opt${i === rec ? " pick" : ""}">
+        ${i === rec ? '<span class="opt-tag">Where we\'d start you</span>' : ""}
+        <p class="opt-name">${t.name}</p>
+        <p class="opt-for">${t.who}</p>
+        <div class="opt-price">
+          <b>${money(t.setup)}</b><span>to build</span>
+          <b style="font-size:1.15rem">${money(t.monthly)}</b><span>a month after</span>
+        </div>
+        <ul class="opt-list">${t.includes.map(x => `<li>${x}</li>`).join("")}</ul>
+        <div class="opt-be">Pays for itself at <b>${customers} recovered customer${customers === 1 ? "" : "s"}</b> in year one — ${perMonthTxt}.</div>
+      </div>`;
+  }).join("");
+
+  if (BOOKING_URL) $("call-btn").href = BOOKING_URL;
+  else $("call-btn").href = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Call about my missed calls")}`;
+}
+
+// ── The text message Make will send ──────────────────────────────────────
+// Built here so the Make scenario needs no logic — it just relays report_sms.
+function buildSms(n, rec) {
+  const t = TIERS[rec];
+  const name = document.querySelector('[data-key="first_name"]').value.trim();
+  return `Hey ${name}, Sisto here — Fork Algorithm.\n\n` +
+    `Your numbers: ${n.calls} missed calls a week at ${money(n.value)} a customer is about ${money(n.annual)} a year walking away.\n\n` +
+    `Recover just ${Math.round(RECOVERY_RATE * 100)}% and that's ${money(n.recovered)} back.\n\n` +
+    `What I'd start you on: ${t.name} — ${money(t.setup)} to build, ${money(t.monthly)}/mo. ` +
+    `It pays for itself at ${Math.max(1, Math.ceil((t.setup + t.monthly * 12) / n.value))} recovered customers in year one.\n\n` +
+    `Want to talk it through? Just reply to this text.`;
+}
+
+function buildEmailBody(n, rec) {
+  return TIERS.map((t, i) =>
+    `${i === rec ? "→ " : "  "}${t.name} — ${money(t.setup)} setup, ${money(t.monthly)}/mo\n` +
+    t.includes.map(x => `     • ${x}`).join("\n")
+  ).join("\n\n");
+}
+
+// ── Submit ───────────────────────────────────────────────────────────────
+let sending = false;
+
+async function go() {
+  if (sending) return;
+  if (!validate()) return;
+  sending = true;
+
+  const n = crunch();
+  const rec = recommend();
+  const ref = "FA-" + Math.random().toString(36).slice(2, 7).toUpperCase();
+
+  const payload = {
+    form_type: "fit_report",
+    submission_id: ref,
+    submitted_at: new Date().toISOString(),
+
+    first_name: document.querySelector('[data-key="first_name"]').value.trim(),
+    business_name: document.querySelector('[data-key="business_name"]').value.trim(),
+    mobile: document.querySelector('[data-key="mobile"]').value.trim(),
+    mobile_e164: "+1" + document.querySelector('[data-key="mobile"]').value.replace(/\D/g, "").slice(-10),
+    email: document.querySelector('[data-key="email"]').value.trim(),
+    consent_sms: document.querySelector('[data-key="consent_sms"]').checked ? "yes" : "no",
+
+    business_type: picks.business_type,
+    missed_calls_band: picks.missed_band,
+    missed_calls_estimate: n.calls,
+    customer_value_band: picks.value_band,
+    customer_value_estimate: n.value,
+    callback_speed: picks.callback_speed,
+    channels: (picks.channels || []).join("; "),
+    wants: (picks.wants || []).join("; "),
+
+    weekly_loss: n.weekly,
+    annual_loss: n.annual,
+    recovery_rate: RECOVERY_RATE,
+    recoverable_annual: n.recovered,
+
+    recommended_tier: TIERS[rec].name,
+    recommended_setup: TIERS[rec].setup,
+    recommended_monthly: TIERS[rec].monthly,
+    recommended_year_one: TIERS[rec].setup + TIERS[rec].monthly * 12,
+
+    report_sms: buildSms(n, rec),
+    report_options: buildEmailBody(n, rec)
+  };
+
+  $("s-q").classList.remove("active");
+  $("loading").style.display = "block";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  let ok = false;
+  try {
+    if (!MAKE_WEBHOOK_URL) throw new Error("No webhook configured");
+    // text/plain keeps this a simple CORS request — no preflight for Make to answer.
+    const res = await fetch(MAKE_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
+      body: JSON.stringify(payload)
+    });
+    ok = res.ok;
+  } catch(e) { ok = false; }
+
+  // The report shows either way — a webhook problem is ours, not theirs.
+  await new Promise(r => setTimeout(r, 600));
+  render(n, rec);
+
+  const sent = $("sent");
+  sent.classList.add("show");
+  sent.innerHTML = ok
+    ? `📲 Sent to your phone — check your texts. Your reference is <b>${ref}</b>.`
+    : `Here's your report. We had trouble texting it, so screenshot this or <a href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("My report " + ref)}" style="color:inherit">email us</a> and we'll send it over.`;
+
+  $("loading").style.display = "none";
+  $("s-report").classList.add("active");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  sending = false;
+}
+
+$("go-btn").addEventListener("click", go);
+</script>
+</body>
+</html>

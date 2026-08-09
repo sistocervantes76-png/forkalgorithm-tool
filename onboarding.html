@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="robots" content="noindex"/>
+<title>Fork Algorithm — Client Onboarding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#1a1714;--ink2:#3d3830;--ink3:#7a7168;
+  --cream:#faf6ef;--cream2:#f2ebe0;--cream3:#e8dece;
+  --terra:#bf5a2f;--terra-light:#f0d5c8;--terra-dark:#8c3e1c;
+  --white:#ffffff;--border:#dfd6ca;--r:10px;--rs:6px;
+}
+html{font-size:16px}
+body{font-family:'Outfit',sans-serif;background:#d4c4a8;color:var(--ink);min-height:100vh;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:680px;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+
+/* Header */
+.top{text-align:center;padding-bottom:2rem;border-bottom:1px solid var(--border);margin-bottom:2rem}
+.logo{font-family:'Cormorant Garamond',serif;font-size:.85rem;letter-spacing:.25em;text-transform:uppercase;color:var(--terra);margin-bottom:1.25rem;display:block}
+.headline{font-family:'Cormorant Garamond',serif;font-size:clamp(1.8rem,5vw,2.7rem);line-height:1.1;font-weight:600;color:var(--ink);margin-bottom:.75rem}
+.headline em{font-style:italic;color:var(--terra)}
+.sub{font-size:.9rem;color:var(--ink3);font-weight:300;max-width:440px;margin:0 auto}
+
+/* Progress */
+.prog-wrap{margin-bottom:1.5rem}
+.prog-meta{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.45rem}
+.prog-step{font-size:.68rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--terra)}
+.prog-pct{font-size:.68rem;letter-spacing:.08em;color:var(--ink3)}
+.prog-bar{height:4px;background:var(--cream2);border-radius:100px;overflow:hidden}
+.prog-fill{height:100%;width:0;background:var(--terra);border-radius:100px;transition:width .35s ease}
+
+/* Screen management */
+.screen{display:none;animation:fadeUp .35s ease both}
+.screen.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Cards */
+.form-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:2rem;margin-bottom:1.25rem}
+@media(max-width:440px){.form-card{padding:1.4rem}}
+.step-title{font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:600;line-height:1.2;margin-bottom:.3rem}
+.step-note{font-size:.85rem;color:var(--ink3);font-weight:300;margin-bottom:1.75rem;line-height:1.5}
+
+/* Fields */
+.field{margin-bottom:1.15rem}
+.label{font-size:.7rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:.35rem}
+.label .req{color:var(--terra)}
+.hint{font-size:.76rem;color:var(--ink3);font-weight:300;margin-top:.3rem;line-height:1.45}
+input[type=text],input[type=tel],input[type=email],input[type=url],input[type=number],input[type=date],input[type=time],select,textarea{
+  width:100%;padding:.65rem .85rem;border:1px solid var(--border);border-radius:var(--rs);background:var(--white);
+  font-family:'Outfit',sans-serif;font-size:.9rem;color:var(--ink);outline:none;transition:border-color .15s}
+textarea{resize:vertical;min-height:80px;line-height:1.55}
+input:focus,select:focus,textarea:focus{border-color:var(--terra)}
+input::placeholder,textarea::placeholder{color:var(--ink3)}
+input.bad,select.bad,textarea.bad{border-color:#d9694a;background:#fff8f5}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+@media(max-width:480px){.two{grid-template-columns:1fr}}
+
+/* Chips */
+.chips{display:flex;flex-wrap:wrap;gap:.45rem}
+.chip{padding:.38rem .85rem;border:1px solid var(--border);border-radius:100px;background:var(--white);font-family:'Outfit',sans-serif;font-size:.78rem;cursor:pointer;color:var(--ink2);transition:all .15s;user-select:none}
+.chip:hover{border-color:var(--terra)}
+.chip.on{background:var(--terra-light);border-color:var(--terra);color:var(--terra-dark)}
+.chips.bad{outline:1px solid #d9694a;outline-offset:5px;border-radius:var(--rs)}
+
+/* Checkbox rows */
+.checks{display:flex;flex-direction:column;gap:.15rem}
+.check{display:flex;align-items:flex-start;gap:.6rem;padding:.45rem 0;cursor:pointer;font-size:.86rem;color:var(--ink2);line-height:1.45}
+.check input{width:16px;height:16px;margin-top:.22rem;accent-color:var(--terra);flex-shrink:0;cursor:pointer}
+
+/* Service list */
+.svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.75rem}
+@media(max-width:440px){.svc-grid{grid-template-columns:1fr}}
+.add-btn{width:100%;border:1px dashed var(--border);border-radius:var(--rs);background:none;padding:.55rem;font-family:'Outfit',sans-serif;font-size:.82rem;color:var(--ink3);cursor:pointer;transition:all .15s}
+.add-btn:hover{border-color:var(--terra);color:var(--terra)}
+.add-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* Hours */
+.hours{display:flex;flex-direction:column;gap:.4rem}
+.hrow{display:grid;grid-template-columns:2.6rem 1fr 1fr auto;gap:.45rem;align-items:center}
+.hrow .day{font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+.hrow input[type=time]{padding:.45rem .5rem;font-size:.82rem}
+.hrow .cl{display:flex;align-items:center;gap:.3rem;font-size:.72rem;color:var(--ink3);cursor:pointer;white-space:nowrap}
+.hrow .cl input{width:15px;height:15px;accent-color:var(--terra);cursor:pointer}
+.hrow.off input[type=time]{opacity:.35;pointer-events:none}
+
+/* Live text preview */
+.preview{background:var(--ink);border-radius:var(--r);padding:1.4rem;margin-top:.5rem}
+.preview-eye{font-size:.66rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:.85rem}
+.bubble{background:var(--cream);color:var(--ink2);border-radius:14px 14px 14px 4px;padding:.75rem .95rem;font-size:.86rem;line-height:1.5;max-width:92%}
+.bubble+.bubble{margin-top:.5rem}
+.preview-foot{font-size:.72rem;color:rgba(255,255,255,.35);margin-top:.85rem;line-height:1.45}
+
+/* Review summary */
+.rev-toggle{width:100%;padding:.7rem .9rem;border:1px solid var(--border);border-radius:var(--rs);background:var(--cream);font-family:'Outfit',sans-serif;font-size:.84rem;color:var(--ink2);cursor:pointer;text-align:left;display:flex;justify-content:space-between;align-items:center;transition:all .15s}
+.rev-toggle:hover{border-color:var(--terra)}
+.rev-body{display:none;padding:1rem 0 .25rem}
+.rev-body.open{display:block}
+.rev-row{display:grid;grid-template-columns:11rem 1fr;gap:.75rem;padding:.4rem 0;border-bottom:1px solid var(--cream2);font-size:.83rem}
+@media(max-width:480px){.rev-row{grid-template-columns:1fr;gap:.1rem}}
+.rev-k{color:var(--ink3);font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;padding-top:.15rem}
+.rev-v{color:var(--ink2);word-break:break-word}
+.rev-v.empty{color:var(--cream3);font-style:italic}
+
+/* Contract */
+.contract{background:var(--cream);border:1px solid var(--border);border-radius:var(--rs);padding:1.5rem;max-height:420px;overflow-y:auto;margin-bottom:1.25rem}
+@media(max-width:440px){.contract{padding:1.1rem}}
+.contract h3{font-family:'Cormorant Garamond',serif;font-size:1.25rem;font-weight:600;margin-bottom:.15rem}
+.contract .cmeta{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:1.25rem;padding-bottom:.75rem;border-bottom:1px solid var(--cream3)}
+.contract h4{font-size:.72rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--terra);margin:1.15rem 0 .4rem}
+.contract p{font-size:.84rem;color:var(--ink2);line-height:1.6;margin-bottom:.5rem}
+.contract ul{list-style:none;margin:.25rem 0 .5rem}
+.contract li{font-size:.84rem;color:var(--ink2);line-height:1.55;padding:.15rem 0 .15rem 1rem;position:relative}
+.contract li::before{content:"–";position:absolute;left:0;color:var(--cream3)}
+.contract .terms{background:var(--white);border:1px solid var(--border);border-radius:var(--rs);padding:.85rem 1rem;margin:.5rem 0}
+.contract .terms div{display:flex;justify-content:space-between;gap:1rem;font-size:.84rem;padding:.22rem 0;color:var(--ink2)}
+.contract .terms div span:first-child{color:var(--ink3)}
+.contract .terms div strong{font-weight:500}
+.sign-box{border:1px solid var(--terra-light);background:#fffaf7;border-radius:var(--rs);padding:1.25rem}
+.sign-title{font-size:.7rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--terra);margin-bottom:.9rem}
+.sig-preview{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.5rem;color:var(--ink);border-bottom:1px solid var(--border);padding:.35rem .2rem;min-height:2.4rem;margin-bottom:.35rem}
+.sig-preview.empty{color:var(--cream3)}
+
+/* Nav */
+.nav{display:flex;gap:.6rem}
+.back-btn{padding:.85rem 1.35rem;background:none;border:1px solid var(--border);border-radius:var(--rs);font-family:'Outfit',sans-serif;font-size:.88rem;color:var(--ink3);cursor:pointer;transition:all .15s;background:var(--white)}
+.back-btn:hover{border-color:var(--terra);color:var(--terra)}
+.next-btn{flex:1;padding:.95rem;background:var(--terra);color:#fff;border:none;border-radius:var(--rs);font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-style:italic;cursor:pointer;transition:background .15s,transform .1s}
+.next-btn:hover{background:var(--terra-dark)}
+.next-btn:active{transform:scale(.99)}
+.next-btn:disabled{background:var(--ink3);cursor:not-allowed}
+
+/* Error */
+.err{background:#fff3ef;border:1px solid #f5c4a8;border-radius:var(--rs);padding:.7rem 1rem;font-size:.84rem;color:var(--terra-dark);margin-bottom:.85rem;display:none}
+.err.show{display:block}
+
+/* Saved note */
+.saved{text-align:center;font-size:.74rem;color:var(--ink3);margin-top:1rem}
+.saved b{color:var(--terra);font-weight:500}
+
+/* Done */
+.thanks{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:2.5rem 2rem;text-align:center}
+.thanks-icon{font-size:2.5rem;margin-bottom:1rem}
+.thanks-title{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:600;margin-bottom:.5rem}
+.thanks-sub{font-size:.87rem;color:var(--ink3);font-weight:300;max-width:400px;margin:0 auto 1.5rem;line-height:1.55}
+.next-list{text-align:left;max-width:400px;margin:0 auto 1.5rem}
+.next-list li{list-style:none;counter-increment:n;padding:.5rem 0 .5rem 2.25rem;border-bottom:1px solid var(--cream2);font-size:.86rem;color:var(--ink2);position:relative;line-height:1.5}
+.next-list{counter-reset:n}
+.next-list li::before{content:counter(n);position:absolute;left:0;top:.5rem;width:1.5rem;height:1.5rem;background:var(--cream2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:500;color:var(--ink3)}
+.ref{font-size:.74rem;color:var(--ink3);letter-spacing:.06em}
+.ref b{color:var(--ink2);font-weight:500}
+
+/* Fallback */
+.fallback-txt{width:100%;min-height:220px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.76rem;line-height:1.5;background:var(--cream);margin-bottom:.75rem}
+.share-row{display:flex;justify-content:center;gap:.65rem;flex-wrap:wrap}
+.share-btn{padding:.55rem 1.1rem;border:1px solid var(--border);border-radius:100px;background:var(--white);font-family:'Outfit',sans-serif;font-size:.8rem;color:var(--ink2);cursor:pointer;transition:all .15s}
+.share-btn:hover{border-color:var(--terra);color:var(--terra)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <span class="logo">Fork Algorithm</span>
+    <h1 class="headline">Let's set up your <em>missed-call system</em></h1>
+    <p class="sub">About 10 minutes. Your answers build your text-back script, your alerts, and your agreement. Your progress saves automatically.</p>
+  </header>
+
+  <div class="prog-wrap">
+    <div class="prog-meta">
+      <span class="prog-step" id="prog-step">Step 1 of 7 — Your business</span>
+      <span class="prog-pct" id="prog-pct">0%</span>
+    </div>
+    <div class="prog-bar"><div class="prog-fill" id="prog-fill"></div></div>
+  </div>
+
+  <!-- ══ STEP 1 — BUSINESS BASICS ══ -->
+  <div id="s-1" class="screen active">
+    <div class="form-card">
+      <h2 class="step-title">Your business</h2>
+      <p class="step-note">The basics we need to set up your account and make the texts sound like you.</p>
+
+      <div class="field">
+        <label class="label">Legal business name <span class="req">*</span></label>
+        <input type="text" data-key="legal_business_name" placeholder="e.g. Cervantes Property Services LLC"/>
+        <p class="hint">Exactly as it appears on your business registration — this is used for carrier approval.</p>
+      </div>
+
+      <div class="field">
+        <label class="label">Name customers know you by <span class="req">*</span></label>
+        <input type="text" data-key="display_name" placeholder="e.g. Cervantes Lawn Care"/>
+        <p class="hint">This is the name that appears in the text: "Hi, this is <b>[your name here]</b>."</p>
+      </div>
+
+      <div class="field">
+        <label class="label">What kind of business? <span class="req">*</span></label>
+        <div class="chips" data-chips="business_type" data-multi="false">
+          <span class="chip" data-val="Restaurant / Food">Restaurant / Food</span>
+          <span class="chip" data-val="Lawn &amp; Landscaping">Lawn &amp; Landscaping</span>
+          <span class="chip" data-val="General Contractor / Construction">Contractor / Construction</span>
+          <span class="chip" data-val="HVAC">HVAC</span>
+          <span class="chip" data-val="Plumbing">Plumbing</span>
+          <span class="chip" data-val="Electrical">Electrical</span>
+          <span class="chip" data-val="Roofing">Roofing</span>
+          <span class="chip" data-val="Cleaning">Cleaning</span>
+          <span class="chip" data-val="Pressure Washing">Pressure Washing</span>
+          <span class="chip" data-val="Pest Control">Pest Control</span>
+          <span class="chip" data-val="Pool Service">Pool Service</span>
+          <span class="chip" data-val="Other">Other</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Website</label>
+        <input type="url" data-key="website" placeholder="https://"/>
+      </div>
+
+      <div class="field">
+        <label class="label">Service area or address <span class="req">*</span></label>
+        <input type="text" data-key="service_area" placeholder="e.g. Broward County — Fort Lauderdale, Plantation, Davie"/>
+        <p class="hint">Cities or ZIP codes you serve. If you're a restaurant, your address is fine.</p>
+      </div>
+
+      <div class="field">
+        <label class="label">Time zone <span class="req">*</span></label>
+        <select data-key="timezone">
+          <option value="">Choose one…</option>
+          <option>Eastern (ET)</option>
+          <option>Central (CT)</option>
+          <option>Mountain (MT)</option>
+          <option>Arizona (MST)</option>
+          <option>Pacific (PT)</option>
+          <option>Alaska (AKT)</option>
+          <option>Hawaii (HT)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ STEP 2 — PHONES & ALERTS ══ -->
+  <div id="s-2" class="screen">
+    <div class="form-card">
+      <h2 class="step-title">Phones &amp; alerts</h2>
+      <p class="step-note">Which number we watch for missed calls, and who we ping when a lead comes in.</p>
+
+      <div class="field">
+        <label class="label">Main number customers call <span class="req">*</span></label>
+        <input type="tel" data-key="main_business_number" placeholder="(954) 555-0100"/>
+        <p class="hint">This is the number we watch. You keep it — nothing about your current line changes.</p>
+      </div>
+
+      <div class="field two">
+        <div>
+          <label class="label">Current phone provider</label>
+          <input type="text" data-key="current_phone_provider" placeholder="e.g. Verizon, RingCentral"/>
+        </div>
+        <div>
+          <label class="label">Who answers calls today?</label>
+          <input type="text" data-key="who_answers_now" placeholder="e.g. me, or my wife when I'm on a job"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Text alerts go to these numbers <span class="req">*</span></label>
+        <input type="text" data-key="alert_sms_numbers" placeholder="(954) 555-0100, (954) 555-0188"/>
+        <p class="hint">Whoever should get a text the second a new lead comes in. Separate multiple with commas.</p>
+      </div>
+
+      <div class="field">
+        <label class="label">Email alerts go to <span class="req">*</span></label>
+        <input type="text" data-key="alert_emails" placeholder="you@yourbusiness.com"/>
+      </div>
+
+      <div class="field">
+        <label class="label">Business hours <span class="req">*</span></label>
+        <div class="hours" id="hours"></div>
+        <button type="button" class="add-btn" id="copy-hours" style="margin-top:.6rem">Copy Monday's hours to every day</button>
+      </div>
+
+      <div class="field">
+        <label class="label">After-hours message</label>
+        <textarea data-key="after_hours_message" placeholder="e.g. Thanks for reaching out! We're closed right now but we've got your request and will call you first thing in the morning."></textarea>
+        <p class="hint">What the text should say when someone calls outside your hours. Leave blank and we'll write one for you.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ STEP 3 — SERVICES & THE TEXT ══ -->
+  <div id="s-3" class="screen">
+    <div class="form-card">
+      <h2 class="step-title">Your services &amp; the text</h2>
+      <p class="step-note">These become the options your customer taps when they get the text back.</p>
+
+      <div class="field">
+        <label class="label">Services to offer in the text <span class="req">*</span></label>
+        <div class="svc-grid" id="svc-grid">
+          <input type="text" data-svc placeholder="e.g. Lawn mowing" maxlength="40"/>
+          <input type="text" data-svc placeholder="e.g. Hedge trimming" maxlength="40"/>
+          <input type="text" data-svc placeholder="e.g. Yard cleanup" maxlength="40"/>
+          <input type="text" data-svc placeholder="e.g. Landscaping" maxlength="40"/>
+        </div>
+        <button type="button" class="add-btn" id="add-svc">+ Add another service</button>
+        <p class="hint">Add up to 6. Put your most-requested service first.</p>
+      </div>
+
+      <div class="field">
+        <label class="label">What should we ask them? <span class="req">*</span></label>
+        <div class="checks" data-checks="qualification_questions">
+          <label class="check"><input type="checkbox" value="Property address" checked/><span>What's the property address?</span></label>
+          <label class="check"><input type="checkbox" value="One-time or recurring" checked/><span>Is this a one-time job or recurring service?</span></label>
+          <label class="check"><input type="checkbox" value="Preferred timing" checked/><span>When would you like the work completed?</span></label>
+          <label class="check"><input type="checkbox" value="Photos of the job" checked/><span>Can you send a photo or two of the job?</span></label>
+          <label class="check"><input type="checkbox" value="Name and callback number" checked/><span>What's your name and best callback number?</span></label>
+        </div>
+        <p class="hint">Uncheck anything that doesn't fit how you work. Fewer questions usually means more replies.</p>
+      </div>
+
+      <div class="field">
+        <label class="label">One extra question of your own</label>
+        <input type="text" data-key="custom_question" placeholder="e.g. Is this for a home or a business?"/>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <label class="label">Here's what your customer will see</label>
+        <div class="preview">
+          <p class="preview-eye">Live preview</p>
+          <div class="bubble" id="pv-1">Hi, this is your business. Sorry we missed your call…</div>
+          <div class="bubble" id="pv-2">Thanks. What is the property address?</div>
+          <p class="preview-foot" id="pv-foot">Updates as you type above.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ STEP 4 — GUARDRAILS & ESCALATION ══ -->
+  <div id="s-4" class="screen">
+    <div class="form-card">
+      <h2 class="step-title">Guardrails</h2>
+      <p class="step-note">The rules the system follows so it never says something you'd have to walk back.</p>
+
+      <div class="field">
+        <label class="label">Can it talk about price? <span class="req">*</span></label>
+        <div class="chips" data-chips="pricing_policy" data-multi="false">
+          <span class="chip" data-val="Never quote a price">Never quote a price</span>
+          <span class="chip" data-val="Ranges only">Ranges only</span>
+          <span class="chip" data-val="Quote from an approved list">Approved list</span>
+        </div>
+        <p class="hint">Most owners start with "never quote" — the system collects details and you set the price.</p>
+      </div>
+
+      <div class="field" id="f-ranges" style="display:none">
+        <label class="label">Your approved prices or ranges <span class="req">*</span></label>
+        <textarea data-key="approved_price_ranges" placeholder="e.g. Standard mow, quarter-acre: $45–65 — Yard cleanup: starts at $200 — Anything over half an acre: needs a look first"></textarea>
+      </div>
+
+      <div class="field">
+        <label class="label">Anything it must never say or promise</label>
+        <textarea data-key="never_say" placeholder="e.g. Never promise same-day service. Never say we do tree removal — we don't."></textarea>
+      </div>
+
+      <div class="field two">
+        <div>
+          <label class="label">Minimum job you'll take</label>
+          <input type="text" data-key="minimum_job_size" placeholder="e.g. $150"/>
+        </div>
+        <div>
+          <label class="label">Jobs you don't take</label>
+          <input type="text" data-key="jobs_not_accepted" placeholder="e.g. tree removal, pools"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Do you offer recurring service? <span class="req">*</span></label>
+        <div class="chips" data-chips="offers_recurring" data-multi="false">
+          <span class="chip" data-val="Yes">Yes</span>
+          <span class="chip" data-val="No">No</span>
+          <span class="chip" data-val="Sometimes">Sometimes</span>
+        </div>
+      </div>
+
+      <div class="field two">
+        <div>
+          <label class="label">Who takes urgent calls? <span class="req">*</span></label>
+          <input type="text" data-key="escalation_contact_name" placeholder="Name"/>
+        </div>
+        <div>
+          <label class="label">Their cell <span class="req">*</span></label>
+          <input type="tel" data-key="escalation_contact_phone" placeholder="(954) 555-0100"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Hand it to a human right away when… <span class="req">*</span></label>
+        <div class="checks" data-checks="urgent_triggers">
+          <label class="check"><input type="checkbox" value="Emergency or urgent same-day" checked/><span>It's an emergency or they need same-day service</span></label>
+          <label class="check"><input type="checkbox" value="Property damage reported" checked/><span>They're reporting property damage</span></label>
+          <label class="check"><input type="checkbox" value="Angry or legal threat" checked/><span>They're angry or mention legal action</span></label>
+          <label class="check"><input type="checkbox" value="Commercial or high-value lead" checked/><span>It's a commercial or big-ticket job</span></label>
+          <label class="check"><input type="checkbox" value="Asks for a person" checked/><span>They ask to talk to a person</span></label>
+          <label class="check"><input type="checkbox" value="Service we do not offer"/><span>They're asking about something we don't do</span></label>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <label class="label">Backup contact if that person is unreachable</label>
+        <input type="text" data-key="backup_contact" placeholder="Name and number"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ STEP 5 — BOOKING, TRACKING & BASELINE ══ -->
+  <div id="s-5" class="screen">
+    <div class="form-card">
+      <h2 class="step-title">Where leads land</h2>
+      <p class="step-note">What happens after the system has the details, and where you'll see it all.</p>
+
+      <div class="field">
+        <label class="label">What should the system aim for? <span class="req">*</span></label>
+        <div class="chips" data-chips="lead_outcome" data-multi="false">
+          <span class="chip" data-val="Booking">Book the job</span>
+          <span class="chip" data-val="Estimate request">Take an estimate request</span>
+          <span class="chip" data-val="Callback only">Just get a callback set up</span>
+        </div>
+      </div>
+
+      <div class="field two">
+        <div>
+          <label class="label">Calendar or CRM you use</label>
+          <select data-key="existing_crm">
+            <option value="">Choose one…</option>
+            <option>None / spreadsheet</option>
+            <option>Google Calendar</option>
+            <option>Jobber</option>
+            <option>Housecall Pro</option>
+            <option>ServiceTitan</option>
+            <option>Toast</option>
+            <option>Square</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">Where should leads show up?</label>
+          <input type="text" data-key="lead_destination" placeholder="e.g. Google Sheet + text to me"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Your other channels</label>
+        <div class="two" style="margin-bottom:.6rem">
+          <input type="url" data-key="google_business_profile_url" placeholder="Google Business Profile link"/>
+          <input type="url" data-key="facebook_url" placeholder="Facebook page link"/>
+        </div>
+        <div class="two">
+          <input type="url" data-key="instagram_url" placeholder="Instagram link"/>
+          <input type="url" data-key="logo_url" placeholder="Link to your logo"/>
+        </div>
+        <p class="hint">Optional. If your plan includes them, these feed into the same system. No logo link? Just email it over.</p>
+      </div>
+
+      <div class="field">
+        <label class="label">How should the texts sound? <span class="req">*</span></label>
+        <div class="chips" data-chips="brand_tone" data-multi="false">
+          <span class="chip" data-val="Professional">Professional</span>
+          <span class="chip" data-val="Friendly">Friendly</span>
+          <span class="chip" data-val="Casual">Casual and local</span>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <label class="label">Your starting numbers <span class="req">*</span></label>
+        <p class="hint" style="margin-top:0;margin-bottom:.6rem">Rough estimates are fine. We use these to show you what the system recovered.</p>
+        <div class="two" style="margin-bottom:.6rem">
+          <div>
+            <input type="number" data-key="missed_calls_per_week" placeholder="Missed calls in a normal week" min="0"/>
+          </div>
+          <div>
+            <input type="number" data-key="avg_customer_value" placeholder="Average value of a new customer ($)" min="0"/>
+          </div>
+        </div>
+        <input type="text" data-key="current_callback_time" placeholder="How long before someone usually calls back?"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ STEP 6 — REGISTRATION ══ -->
+  <div id="s-6" class="screen">
+    <div class="form-card">
+      <h2 class="step-title">Carrier registration</h2>
+      <p class="step-note">US carriers require every business texting number to be registered. This is that paperwork — it's the slowest part, so getting it right now saves you a week.</p>
+
+      <div class="field two">
+        <div>
+          <label class="label">EIN / Tax ID <span class="req">*</span></label>
+          <input type="text" data-key="ein" placeholder="12-3456789"/>
+        </div>
+        <div>
+          <label class="label">Which plan did you sign up for? <span class="req">*</span></label>
+          <select data-key="tier">
+            <option value="">Choose one…</option>
+            <option>Speed to Lead</option>
+            <option>Growth</option>
+            <option>Revenue Operations</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label">Registered business address <span class="req">*</span></label>
+        <input type="text" data-key="business_address" placeholder="Street, city, state, ZIP"/>
+        <p class="hint">Must match what's on file with the IRS, or carriers reject the registration.</p>
+      </div>
+
+      <div class="field two">
+        <div>
+          <label class="label">Authorized representative <span class="req">*</span></label>
+          <input type="text" data-key="authorized_rep_name" placeholder="Full name"/>
+        </div>
+        <div>
+          <label class="label">Their title <span class="req">*</span></label>
+          <input type="text" data-key="authorized_rep_title" placeholder="e.g. Owner"/>
+        </div>
+      </div>
+
+      <div class="field two">
+        <div>
+          <label class="label">Their email <span class="req">*</span></label>
+          <input type="email" data-key="authorized_rep_email" placeholder="you@yourbusiness.com"/>
+        </div>
+        <div>
+          <label class="label">Target go-live date <span class="req">*</span></label>
+          <input type="date" data-key="target_go_live_date"/>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <div class="checks">
+          <label class="check"><input type="checkbox" data-key="consent_authorize_sms"/><span>I authorize Fork Algorithm to register this business for text messaging and to send texts on its behalf. <span class="req">*</span></span></label>
+          <label class="check"><input type="checkbox" data-key="consent_info_accurate"/><span>The information above is accurate to the best of my knowledge. <span class="req">*</span></span></label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ STEP 7 — AGREEMENT ══ -->
+  <div id="s-7" class="screen">
+    <div class="form-card">
+      <h2 class="step-title">Review &amp; sign</h2>
+      <p class="step-note">Everything you entered, and the agreement built from it. Read it over before you sign.</p>
+
+      <button type="button" class="rev-toggle" id="rev-toggle">
+        <span>Review your answers</span><span id="rev-caret">▾</span>
+      </button>
+      <div class="rev-body" id="rev-body"></div>
+
+      <div style="margin:1.5rem 0 1.25rem">
+        <label class="label">Your agreement</label>
+        <div class="contract" id="contract"></div>
+
+        <div class="field two">
+          <div>
+            <label class="label">Setup fee (as agreed) <span class="req">*</span></label>
+            <input type="number" data-key="agreement_setup_fee" min="0" step="1"/>
+          </div>
+          <div>
+            <label class="label">Monthly fee (as agreed) <span class="req">*</span></label>
+            <input type="number" data-key="agreement_monthly_fee" min="0" step="1"/>
+          </div>
+        </div>
+        <div class="field two" style="margin-bottom:0">
+          <div>
+            <label class="label">Initial term (months) <span class="req">*</span></label>
+            <input type="number" data-key="agreement_term_months" min="1" step="1"/>
+          </div>
+          <div>
+            <label class="label">Notice to cancel (days) <span class="req">*</span></label>
+            <input type="number" data-key="agreement_notice_days" min="0" step="1"/>
+          </div>
+        </div>
+        <p class="hint">These match what you agreed with Sisto. If a number looks wrong, fix it here before signing and we'll confirm it.</p>
+      </div>
+
+      <div class="sign-box">
+        <p class="sign-title">Signature</p>
+        <div class="sig-preview empty" id="sig-preview">Type your name below</div>
+        <div class="field two" style="margin-bottom:.9rem">
+          <div>
+            <input type="text" data-key="signature_name" placeholder="Type your full legal name"/>
+          </div>
+          <div>
+            <input type="text" data-key="signature_title" placeholder="Your title"/>
+          </div>
+        </div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" data-key="signature_agreed"/><span>I have read the agreement above and I'm signing it on behalf of this business. I understand typing my name is a legal signature. <span class="req">*</span></span></label>
+          <label class="check"><input type="checkbox" data-key="consent_case_study"/><span>Fork Algorithm may use our business name, logo, and results in a case study or testimonial. <em style="color:var(--ink3);font-style:normal">Optional — leave unticked and we stay anonymous.</em></span></label>
+        </div>
+        <p class="hint" id="sig-date"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ NAV ══ -->
+  <div id="nav-wrap">
+    <div class="err" id="err"></div>
+    <div class="nav">
+      <button type="button" class="back-btn" id="back-btn" style="display:none">← Back</button>
+      <button type="button" class="next-btn" id="next-btn">Continue</button>
+    </div>
+    <p class="saved" id="saved">Your progress saves automatically — you can close this and come back.</p>
+  </div>
+
+  <!-- ══ DONE ══ -->
+  <div id="s-done" class="screen">
+    <div class="thanks">
+      <div class="thanks-icon">🎉</div>
+      <h2 class="thanks-title">You're all set, <span id="done-name">chef</span>.</h2>
+      <p class="thanks-sub">We've got everything we need to start building. Here's what happens from here.</p>
+      <ol class="next-list">
+        <li>We submit your carrier registration today — that's the part with the wait, usually a few business days.</li>
+        <li>We build your text-back script from the services and questions you picked, and send it to you to approve.</li>
+        <li>We run a live test call together so you see exactly what your customer sees.</li>
+        <li>You go live, and your missed calls start answering themselves.</li>
+      </ol>
+      <p class="ref">Your reference number: <b id="done-ref"></b></p>
+    </div>
+  </div>
+
+  <!-- ══ FALLBACK ══ -->
+  <div id="s-fallback" class="screen">
+    <div class="form-card">
+      <h2 class="step-title">Almost — one manual step</h2>
+      <p class="step-note">We couldn't reach our server just now, but nothing you typed is lost. Copy the summary below and email it to Sisto, and he'll take it from there.</p>
+      <textarea class="fallback-txt" id="fallback-txt" readonly></textarea>
+      <div class="share-row">
+        <button type="button" class="share-btn" id="copy-btn">📋 Copy summary</button>
+        <button type="button" class="share-btn" id="mail-btn">✉️ Email it to Sisto</button>
+        <button type="button" class="share-btn" id="retry-btn">↻ Try sending again</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+// ── CONFIG ───────────────────────────────────────────────────────────────
+// Paste your Make webhook URL here after you create the scenario.
+// See docs/onboarding-setup.md for the step-by-step.
+const MAKE_WEBHOOK_URL = "";
+const CONTACT_EMAIL = "sistocervantes76@gmail.com";
+const AGREEMENT_VERSION = "2026-08-v1";
+const STORAGE_KEY = "fa_onboarding_v1";
+
+// Standard plan pricing. The client can correct these on the agreement step
+// if a different number was agreed on the call.
+const TIERS = {
+  "Speed to Lead":       { setup: 2000, monthly: 350,
+    includes: ["Missed-call text-back on your main line","Service selection and lead capture","Instant text and email alerts to your team","A simple lead pipeline you can see","Setup, testing, and a live test call"] },
+  "Growth":              { setup: 2800, monthly: 500,
+    includes: ["Everything in Speed to Lead","Website and social message capture","Appointment request flow","Photo collection from customers","Automated follow-up when a lead goes quiet","Custom questions for your services","Connection to your calendar or CRM"] },
+  "Revenue Operations":  { setup: 6000, monthly: 800,
+    includes: ["Everything in Growth","Lead capture across every channel you use","Estimate follow-up reminders","Reactivation of leads that never closed","Review requests after completed jobs","A reporting dashboard","Monthly optimization and advanced routing"] }
+};
+
+const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const STEP_NAMES = ["Your business","Phones & alerts","Services & the text","Guardrails","Where leads land","Carrier registration","Review & sign"];
+const TOTAL = 7;
+
+// Fields that must be filled, per step.
+const REQUIRED = {
+  1: ["legal_business_name","display_name","business_type","service_area","timezone"],
+  2: ["main_business_number","alert_sms_numbers","alert_emails"],
+  3: ["services","qualification_questions"],
+  4: ["pricing_policy","offers_recurring","escalation_contact_name","escalation_contact_phone","urgent_triggers"],
+  5: ["lead_outcome","brand_tone","missed_calls_per_week","avg_customer_value"],
+  6: ["ein","tier","business_address","authorized_rep_name","authorized_rep_title","authorized_rep_email","target_go_live_date","consent_authorize_sms","consent_info_accurate"],
+  7: ["agreement_setup_fee","agreement_monthly_fee","agreement_term_months","agreement_notice_days","signature_name","signature_title","signature_agreed"]
+};
+
+const LABELS = {
+  legal_business_name:"Legal name", display_name:"Customers know us as", business_type:"Business type",
+  website:"Website", service_area:"Service area", timezone:"Time zone",
+  main_business_number:"Main number", current_phone_provider:"Phone provider", who_answers_now:"Who answers now",
+  alert_sms_numbers:"Text alerts to", alert_emails:"Email alerts to", business_hours:"Hours",
+  after_hours_message:"After hours", services:"Services", qualification_questions:"We'll ask",
+  custom_question:"Extra question", pricing_policy:"Pricing policy", approved_price_ranges:"Approved prices",
+  never_say:"Never say", minimum_job_size:"Minimum job", jobs_not_accepted:"Won't take",
+  offers_recurring:"Recurring service", escalation_contact_name:"Urgent contact",
+  escalation_contact_phone:"Urgent cell", urgent_triggers:"Escalate when", backup_contact:"Backup contact",
+  lead_outcome:"Goal", existing_crm:"Calendar / CRM", lead_destination:"Leads land in",
+  google_business_profile_url:"Google profile", facebook_url:"Facebook", instagram_url:"Instagram",
+  logo_url:"Logo", brand_tone:"Tone", missed_calls_per_week:"Missed calls / week",
+  avg_customer_value:"Avg customer value", current_callback_time:"Current callback time",
+  ein:"EIN", tier:"Plan", business_address:"Business address", authorized_rep_name:"Authorized rep",
+  authorized_rep_title:"Title", authorized_rep_email:"Rep email", target_go_live_date:"Target go-live"
+};
+
+// ── State ────────────────────────────────────────────────────────────────
+let step = 1;
+let chips = {};   // chip group -> selected value
+let submitting = false;
+let lastPayload = null;
+
+const $  = id => document.getElementById(id);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+// ── Build the hours rows ─────────────────────────────────────────────────
+function buildHours() {
+  $("hours").innerHTML = DAYS.map((d,i) => `
+    <div class="hrow${i>4?" off":""}" data-day="${d}">
+      <span class="day">${d}</span>
+      <input type="time" data-h="open" value="08:00"/>
+      <input type="time" data-h="close" value="17:00"/>
+      <label class="cl"><input type="checkbox" data-h="closed"${i>4?" checked":""}/>closed</label>
+    </div>`).join("");
+}
+
+function readHours() {
+  return $$("#hours .hrow").map(r => {
+    const closed = r.querySelector('[data-h="closed"]').checked;
+    if (closed) return `${r.dataset.day} closed`;
+    return `${r.dataset.day} ${r.querySelector('[data-h="open"]').value}-${r.querySelector('[data-h="close"]').value}`;
+  }).join("; ");
+}
+
+function writeHours(str) {
+  if (!str) return;
+  str.split(";").forEach(part => {
+    const [day, val] = part.trim().split(" ");
+    const row = document.querySelector(`#hours .hrow[data-day="${day}"]`);
+    if (!row || !val) return;
+    const cb = row.querySelector('[data-h="closed"]');
+    if (val === "closed") { cb.checked = true; row.classList.add("off"); return; }
+    cb.checked = false; row.classList.remove("off");
+    const [o,c] = val.split("-");
+    row.querySelector('[data-h="open"]').value = o || "";
+    row.querySelector('[data-h="close"]').value = c || "";
+  });
+}
+
+// ── Reading and writing the form ─────────────────────────────────────────
+function getServices() {
+  return $$("#svc-grid input").map(i => i.value.trim()).filter(Boolean);
+}
+
+function getChecks(group) {
+  return $$(`[data-checks="${group}"] input:checked`).map(i => i.value);
+}
+
+function collect() {
+  const d = {};
+  $$("[data-key]").forEach(el => {
+    d[el.dataset.key] = el.type === "checkbox" ? el.checked : el.value.trim();
+  });
+  Object.assign(d, chips);
+  d.services = getServices();
+  d.qualification_questions = getChecks("qualification_questions");
+  d.urgent_triggers = getChecks("urgent_triggers");
+  d.business_hours = readHours();
+  return d;
+}
+
+function restore(d) {
+  $$("[data-key]").forEach(el => {
+    const v = d[el.dataset.key];
+    if (v === undefined) return;
+    if (el.type === "checkbox") el.checked = !!v; else el.value = v;
+  });
+  Object.keys(chips).forEach(g => {
+    const v = d[g];
+    if (!v) return;
+    chips[g] = v;
+    const c = document.querySelector(`[data-chips="${g}"] .chip[data-val="${CSS.escape(v)}"]`);
+    if (c) c.classList.add("on");
+  });
+  if (Array.isArray(d.services)) {
+    while ($("svc-grid").children.length < d.services.length) addService();
+    $$("#svc-grid input").forEach((el,i) => { el.value = d.services[i] || ""; });
+  }
+  ["qualification_questions","urgent_triggers"].forEach(g => {
+    if (!Array.isArray(d[g])) return;
+    $$(`[data-checks="${g}"] input`).forEach(el => { el.checked = d[g].includes(el.value); });
+  });
+  writeHours(d.business_hours);
+}
+
+// ── Save / load ──────────────────────────────────────────────────────────
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ step, data: collect() })); } catch(e) {}
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    restore(saved.data || {});
+    step = Math.min(Math.max(saved.step || 1, 1), TOTAL);
+    return true;
+  } catch(e) { return false; }
+}
+
+// ── Validation ───────────────────────────────────────────────────────────
+function clearBad() {
+  $$(".bad").forEach(el => el.classList.remove("bad"));
+  $("err").classList.remove("show");
+}
+
+function validate(n) {
+  clearBad();
+  const d = collect();
+  const missing = [];
+
+  (REQUIRED[n] || []).forEach(key => {
+    const v = d[key];
+    const empty = Array.isArray(v) ? v.length === 0 : (v === "" || v === false || v === undefined);
+    if (!empty) return;
+    missing.push(key);
+    const el = document.querySelector(`[data-key="${key}"]`);
+    if (el) el.classList.add("bad");
+    const chipGroup = document.querySelector(`[data-chips="${key}"]`);
+    if (chipGroup) chipGroup.classList.add("bad");
+    if (key === "services") $$("#svc-grid input")[0].classList.add("bad");
+  });
+
+  if (n === 4 && d.pricing_policy === "Ranges only" && !d.approved_price_ranges) {
+    missing.push("approved_price_ranges");
+    document.querySelector('[data-key="approved_price_ranges"]').classList.add("bad");
+  }
+  if (n === 6 && d.authorized_rep_email && !d.authorized_rep_email.includes("@")) {
+    missing.push("authorized_rep_email");
+    document.querySelector('[data-key="authorized_rep_email"]').classList.add("bad");
+  }
+
+  if (!missing.length) return true;
+
+  const consent = missing.some(k => k.startsWith("consent_") || k === "signature_agreed");
+  $("err").textContent = consent && missing.length === 1
+    ? "Please tick the box above to continue."
+    : "Please fill in the highlighted fields — they're the ones we can't build without.";
+  $("err").classList.add("show");
+  const firstBad = document.querySelector(".bad");
+  if (firstBad) firstBad.scrollIntoView({ behavior:"smooth", block:"center" });
+  return false;
+}
+
+// ── Navigation ───────────────────────────────────────────────────────────
+function goto(n) {
+  step = n;
+  $$(".screen").forEach(s => s.classList.remove("active"));
+  $(`s-${n}`).classList.add("active");
+  $("back-btn").style.display = n > 1 ? "block" : "none";
+  $("next-btn").textContent = n === TOTAL ? "Sign & submit" : "Continue";
+  $("prog-step").textContent = `Step ${n} of ${TOTAL} — ${STEP_NAMES[n-1]}`;
+  const pct = Math.round(((n - 1) / TOTAL) * 100);
+  $("prog-pct").textContent = `${pct}%`;
+  $("prog-fill").style.width = `${pct}%`;
+  if (n === 3) updatePreview();
+  if (n === 7) { renderReview(); renderContract(); }
+  clearBad();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  save();
+}
+
+function finish(screenId) {
+  $$(".screen").forEach(s => s.classList.remove("active"));
+  $(screenId).classList.add("active");
+  $("nav-wrap").style.display = "none";
+  document.querySelector(".prog-wrap").style.display = "none";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// ── Live text preview ────────────────────────────────────────────────────
+function updatePreview() {
+  const d = collect();
+  const name = d.display_name || "your business";
+  const svc = d.services.length ? d.services.join(", ") : "your services";
+  $("pv-1").textContent = `Hi, this is ${name}. Sorry we missed your call. I can help get your request started. What service do you need? — ${svc}`;
+
+  const q = d.qualification_questions;
+  const second = q.includes("Property address") ? "Thanks. What is the property address?"
+    : q.includes("One-time or recurring") ? "Got it. Is this a one-time job or recurring service?"
+    : q.includes("Preferred timing") ? "Great. When would you like the work completed?"
+    : q.includes("Photos of the job") ? "Could you send a photo or two? It helps us understand the job."
+    : q.includes("Name and callback number") ? "What's your name and the best number to reach you?"
+    : "Thanks — someone from our team will follow up shortly.";
+  $("pv-2").textContent = second;
+  $("pv-foot").textContent = `${q.length} question${q.length === 1 ? "" : "s"} in the flow${d.custom_question ? ", plus your custom one" : ""}. Then we alert your team.`;
+}
+
+// ── Review summary ───────────────────────────────────────────────────────
+function renderReview() {
+  const d = collect();
+  const order = ["legal_business_name","display_name","business_type","website","service_area","timezone",
+    "main_business_number","current_phone_provider","who_answers_now","alert_sms_numbers","alert_emails",
+    "business_hours","after_hours_message","services","qualification_questions","custom_question",
+    "pricing_policy","approved_price_ranges","never_say","minimum_job_size","jobs_not_accepted",
+    "offers_recurring","escalation_contact_name","escalation_contact_phone","urgent_triggers","backup_contact",
+    "lead_outcome","existing_crm","lead_destination","google_business_profile_url","facebook_url",
+    "instagram_url","logo_url","brand_tone","missed_calls_per_week","avg_customer_value",
+    "current_callback_time","ein","tier","business_address","authorized_rep_name","authorized_rep_title",
+    "authorized_rep_email","target_go_live_date"];
+
+  $("rev-body").innerHTML = order.map(k => {
+    const raw = d[k];
+    const val = Array.isArray(raw) ? raw.join(", ") : raw;
+    return `<div class="rev-row"><div class="rev-k">${LABELS[k] || k}</div>
+      <div class="rev-v${val ? "" : " empty"}">${val ? esc(val) : "not provided"}</div></div>`;
+  }).join("");
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+
+// ── The agreement ────────────────────────────────────────────────────────
+//
+// NOTE: this is a plain-language services agreement template. Have it reviewed
+// by an attorney before you use it with real clients — the terms here are a
+// starting point, not legal advice.
+function renderContract() {
+  const d = collect();
+  const tier = TIERS[d.tier] ? d.tier : "Speed to Lead";
+  const t = TIERS[tier];
+
+  // Prefill the money fields from the plan the first time we land here.
+  const setupEl = document.querySelector('[data-key="agreement_setup_fee"]');
+  const monthlyEl = document.querySelector('[data-key="agreement_monthly_fee"]');
+  const termEl = document.querySelector('[data-key="agreement_term_months"]');
+  const noticeEl = document.querySelector('[data-key="agreement_notice_days"]');
+  if (!setupEl.value) setupEl.value = t.setup;
+  if (!monthlyEl.value) monthlyEl.value = t.monthly;
+  if (!termEl.value) termEl.value = 3;
+  if (!noticeEl.value) noticeEl.value = 30;
+
+  const setup = Number(setupEl.value || t.setup);
+  const monthly = Number(monthlyEl.value || t.monthly);
+  const term = Number(termEl.value || 3);
+  const notice = Number(noticeEl.value || 30);
+  const money = n => "$" + Number(n).toLocaleString("en-US");
+
+  const client = d.legal_business_name || "[Client business name]";
+  const channels = [
+    d.google_business_profile_url && "your Google Business Profile",
+    d.facebook_url && "Facebook",
+    d.instagram_url && "Instagram"
+  ].filter(Boolean);
+
+  $("contract").innerHTML = `
+    <h3>Automation Services Agreement</h3>
+    <p class="cmeta">Fork Algorithm &nbsp;·&nbsp; ${esc(tier)} &nbsp;·&nbsp; v${AGREEMENT_VERSION}</p>
+
+    <h4>1. Who this is between</h4>
+    <p>This agreement is between <strong>Fork Algorithm</strong>, an automation services company operating in Broward County, Florida ("we", "us"), and <strong>${esc(client)}</strong> ("you"), located at ${esc(d.business_address || "[address]")}.</p>
+
+    <h4>2. What we're building for you</h4>
+    <p>We will set up and run a missed-call text-back and lead-response system for the number ${esc(d.main_business_number || "[your main number]")}. On the ${esc(tier)} plan that includes:</p>
+    <ul>${t.includes.map(i => `<li>${esc(i)}</li>`).join("")}</ul>
+    ${d.services.length ? `<p>The system will offer your customers these services: ${esc(d.services.join(", "))}.</p>` : ""}
+    ${channels.length ? `<p>If your plan covers them, inquiries from ${esc(channels.join(", "))} feed into the same flow.</p>` : ""}
+    <p>Anything outside this list is new work. We'll quote it separately and you approve it before we start.</p>
+
+    <h4>3. What it costs</h4>
+    <div class="terms">
+      <div><span>One-time setup</span><strong>${money(setup)}</strong></div>
+      <div><span>Monthly service</span><strong>${money(monthly)} / month</strong></div>
+      <div><span>Initial term</span><strong>${term} month${term === 1 ? "" : "s"}</strong></div>
+      <div><span>First-year total</span><strong>${money(setup + monthly * 12)}</strong></div>
+    </div>
+    <p>Setup is due before we begin building. The monthly fee starts the day your system goes live and bills on that date each month. Text messaging costs charged by carriers are passed through at cost.</p>
+
+    <h4>4. How long it runs, and how to stop</h4>
+    <p>The initial term is ${term} month${term === 1 ? "" : "s"} from your go-live date. After that it continues month to month. Either of us can end it with ${notice} days' written notice — email counts. If you cancel during the initial term, the remaining months of that term are still owed. The setup fee is not refundable once we've started building.</p>
+
+    <h4>5. What we need from you</h4>
+    <ul>
+      <li>Access to forward or connect the phone number listed above</li>
+      <li>Accurate registration details — carriers reject applications with mismatched information</li>
+      <li>Approval of your message scripts before we go live</li>
+      <li>Someone actually responding to the leads the system captures</li>
+      <li>A heads-up when your services, hours, or pricing change</li>
+    </ul>
+
+    <h4>6. Text messaging rules</h4>
+    <p>You are the sender of these messages; we operate the system on your behalf as your agent. You confirm you have the right to text people who contact your business, and you authorize us to register your business with mobile carriers under the A2P 10DLC program using the details you provided.</p>
+    <p>Every message thread honors opt-outs like STOP automatically. You agree not to ask us to send marketing blasts to people who never contacted you — that's not what this system is for, and it puts your number at risk.</p>
+
+    <h4>7. What we don't promise</h4>
+    <p>We don't guarantee a specific number of leads, bookings, or dollars recovered. Any figures discussed during your consultation were estimates based on your own numbers, used to size the opportunity — not a promise of results. What we guarantee is that the system does what section 2 describes.</p>
+    <p>We also depend on services we don't control — carriers, your phone provider, and the platforms we connect to. If one of them goes down, we'll work to restore service quickly, but outages caused by them aren't a breach of this agreement.</p>
+
+    <h4>8. Your information and your customers' information</h4>
+    <p>Your customer data is yours. We use it only to run your system, and we won't sell it or share it with anyone else. If we part ways, you can request an export of your leads and we'll provide it within 30 days.</p>
+    <p>The automation itself — our scripts, workflows, and templates — stays ours. You're licensed to use it for as long as this agreement is active.</p>
+
+    <h4>9. Limits</h4>
+    <p>Neither of us is liable to the other for indirect or consequential losses. Our total liability under this agreement is capped at the amount you paid us in the three months before the claim.</p>
+
+    <h4>10. The legal fine print</h4>
+    <p>This agreement is governed by the laws of the State of Florida, and any dispute is handled in Broward County. This document, together with the onboarding answers you submitted with it, is the whole agreement between us and replaces anything discussed beforehand. Changes need to be in writing and agreed by both of us.</p>
+
+    <h4>11. Telling your story</h4>
+    <p>If — and only if — you tick the case study box below, you're giving us permission to use your business name, logo, and results in case studies, testimonials, and marketing. You can withdraw that permission any time by emailing us, and we'll stop using it going forward. Leave the box unticked and nothing about your business gets published. This is optional and has no effect on your pricing or service either way.</p>
+
+    <h4>12. Signing</h4>
+    <p>Typing your name below and submitting this form is a legal electronic signature, the same as signing on paper. We record the date and time you signed along with your answers.</p>
+  `;
+}
+
+// ── Submit ───────────────────────────────────────────────────────────────
+function buildPayload() {
+  const d = collect();
+  const tier = TIERS[d.tier] ? d.tier : "Speed to Lead";
+  const setup = Number(d.agreement_setup_fee || TIERS[tier].setup);
+  const monthly = Number(d.agreement_monthly_fee || TIERS[tier].monthly);
+
+  return {
+    submission_id: lastPayload?.submission_id || makeRef(),
+    submitted_at: new Date().toISOString(),
+
+    legal_business_name: d.legal_business_name,
+    display_name: d.display_name,
+    business_type: d.business_type || "",
+    website: d.website,
+    service_area: d.service_area,
+    timezone: d.timezone,
+
+    main_business_number: d.main_business_number,
+    current_phone_provider: d.current_phone_provider,
+    who_answers_now: d.who_answers_now,
+    alert_sms_numbers: d.alert_sms_numbers,
+    alert_emails: d.alert_emails,
+    business_hours: d.business_hours,
+    after_hours_message: d.after_hours_message,
+
+    services: d.services.join("; "),
+    services_count: d.services.length,
+    qualification_questions: d.qualification_questions.join("; "),
+    custom_question: d.custom_question,
+
+    pricing_policy: d.pricing_policy || "",
+    approved_price_ranges: d.approved_price_ranges,
+    never_say: d.never_say,
+    minimum_job_size: d.minimum_job_size,
+    jobs_not_accepted: d.jobs_not_accepted,
+    offers_recurring: d.offers_recurring || "",
+    escalation_contact_name: d.escalation_contact_name,
+    escalation_contact_phone: d.escalation_contact_phone,
+    urgent_triggers: d.urgent_triggers.join("; "),
+    backup_contact: d.backup_contact,
+
+    lead_outcome: d.lead_outcome || "",
+    existing_crm: d.existing_crm,
+    lead_destination: d.lead_destination,
+    google_business_profile_url: d.google_business_profile_url,
+    facebook_url: d.facebook_url,
+    instagram_url: d.instagram_url,
+    logo_url: d.logo_url,
+    brand_tone: d.brand_tone || "",
+
+    missed_calls_per_week: d.missed_calls_per_week,
+    avg_customer_value: d.avg_customer_value,
+    current_callback_time: d.current_callback_time,
+    estimated_annual_loss: (Number(d.missed_calls_per_week) || 0) * (Number(d.avg_customer_value) || 0) * 52,
+
+    ein: d.ein,
+    tier: d.tier,
+    business_address: d.business_address,
+    authorized_rep_name: d.authorized_rep_name,
+    authorized_rep_title: d.authorized_rep_title,
+    authorized_rep_email: d.authorized_rep_email,
+    target_go_live_date: d.target_go_live_date,
+    consent_authorize_sms: d.consent_authorize_sms ? "yes" : "no",
+    consent_info_accurate: d.consent_info_accurate ? "yes" : "no",
+
+    agreement_version: AGREEMENT_VERSION,
+    agreement_tier: tier,
+    agreement_setup_fee: setup,
+    agreement_monthly_fee: monthly,
+    agreement_term_months: Number(d.agreement_term_months || 3),
+    agreement_notice_days: Number(d.agreement_notice_days || 30),
+    agreement_year_one_total: setup + monthly * 12,
+    signature_name: d.signature_name,
+    signature_title: d.signature_title,
+    signature_agreed: d.signature_agreed ? "yes" : "no",
+    consent_case_study: d.consent_case_study ? "yes" : "no",
+    signature_date: new Date().toISOString(),
+    user_agent: navigator.userAgent
+  };
+}
+
+function makeRef() {
+  return "FA-" + Math.random().toString(36).slice(2, 7).toUpperCase();
+}
+
+async function submit() {
+  if (submitting) return;
+  submitting = true;
+  const btn = $("next-btn");
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+
+  const payload = buildPayload();
+  lastPayload = payload;
+
+  try {
+    if (!MAKE_WEBHOOK_URL) throw new Error("No webhook configured");
+    // text/plain keeps this a simple CORS request, so the browser never sends
+    // a preflight that Make's webhook would have to answer. Body is still JSON.
+    const res = await fetch(MAKE_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error("Bad response");
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+    $("done-name").textContent = (payload.signature_name || "").split(" ")[0] || "chef";
+    $("done-ref").textContent = payload.submission_id;
+    finish("s-done");
+  } catch(e) {
+    $("fallback-txt").value = summaryText(payload);
+    finish("s-fallback");
+  } finally {
+    submitting = false;
+    btn.disabled = false;
+    btn.textContent = "Sign & submit";
+  }
+}
+
+function summaryText(p) {
+  return "FORK ALGORITHM — CLIENT ONBOARDING\n" +
+    "Reference: " + p.submission_id + "\n" +
+    "Submitted: " + p.submitted_at + "\n\n" +
+    Object.entries(p)
+      .filter(([k]) => k !== "user_agent" && k !== "submission_id" && k !== "submitted_at")
+      .map(([k,v]) => (LABELS[k] || k.replace(/_/g," ")) + ": " + (v === "" ? "—" : v))
+      .join("\n");
+}
+
+// ── Wire everything up ───────────────────────────────────────────────────
+function addService() {
+  const g = $("svc-grid");
+  if (g.children.length >= 6) return;
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.placeholder = "Another service…";
+  inp.maxLength = 40;
+  inp.setAttribute("data-svc", "");
+  g.appendChild(inp);
+  $("add-svc").disabled = g.children.length >= 6;
+}
+
+function init() {
+  buildHours();
+
+  // Chip groups
+  $$("[data-chips]").forEach(group => {
+    chips[group.dataset.chips] = "";
+    group.addEventListener("click", e => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      group.querySelectorAll(".chip").forEach(c => c.classList.remove("on"));
+      chip.classList.add("on");
+      group.classList.remove("bad");
+      chips[group.dataset.chips] = chip.dataset.val;
+      if (group.dataset.chips === "pricing_policy") {
+        $("f-ranges").style.display = chip.dataset.val === "Ranges only" ? "block" : "none";
+      }
+      if (group.dataset.chips === "tier") renderContract();
+      save();
+    });
+  });
+
+  $("add-svc").addEventListener("click", () => { addService(); save(); });
+
+  $("copy-hours").addEventListener("click", () => {
+    const first = document.querySelector('#hours .hrow');
+    const o = first.querySelector('[data-h="open"]').value;
+    const c = first.querySelector('[data-h="close"]').value;
+    const closed = first.querySelector('[data-h="closed"]').checked;
+    $$("#hours .hrow").forEach(r => {
+      r.querySelector('[data-h="open"]').value = o;
+      r.querySelector('[data-h="close"]').value = c;
+      r.querySelector('[data-h="closed"]').checked = closed;
+      r.classList.toggle("off", closed);
+    });
+    save();
+  });
+
+  $("hours").addEventListener("change", e => {
+    if (e.target.dataset.h === "closed") e.target.closest(".hrow").classList.toggle("off", e.target.checked);
+    save();
+  });
+
+  $("rev-toggle").addEventListener("click", () => {
+    const open = $("rev-body").classList.toggle("open");
+    $("rev-caret").textContent = open ? "▴" : "▾";
+  });
+
+  // Any input change: save, clear the error state, refresh live bits
+  document.addEventListener("input", e => {
+    if (e.target.closest("#s-3")) updatePreview();
+    if (e.target.dataset && e.target.dataset.key === "signature_name") {
+      const v = e.target.value.trim();
+      $("sig-preview").textContent = v || "Type your name below";
+      $("sig-preview").classList.toggle("empty", !v);
+    }
+    if (e.target.dataset && e.target.dataset.key && e.target.dataset.key.startsWith("agreement_")) renderContract();
+    e.target.classList.remove("bad");
+    save();
+  });
+  document.addEventListener("change", e => {
+    if (e.target.closest("#s-3")) updatePreview();
+    if (e.target.dataset && e.target.dataset.key === "tier") renderContract();
+    save();
+  });
+
+  $("next-btn").addEventListener("click", () => {
+    if (!validate(step)) return;
+    if (step === TOTAL) submit(); else goto(step + 1);
+  });
+  $("back-btn").addEventListener("click", () => goto(step - 1));
+
+  $("copy-btn").addEventListener("click", () => {
+    navigator.clipboard.writeText($("fallback-txt").value)
+      .then(() => { $("copy-btn").textContent = "✓ Copied"; })
+      .catch(() => { $("fallback-txt").select(); });
+  });
+  $("mail-btn").addEventListener("click", () => {
+    const p = lastPayload;
+    const subj = encodeURIComponent(`Onboarding — ${p.legal_business_name || "new client"} (${p.submission_id})`);
+    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subj}&body=${encodeURIComponent($("fallback-txt").value)}`;
+  });
+  $("retry-btn").addEventListener("click", () => {
+    document.querySelector(".prog-wrap").style.display = "block";
+    $("nav-wrap").style.display = "block";
+    goto(TOTAL);
+    submit();
+  });
+
+  $("sig-date").textContent = "Signing as of " + new Date().toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" });
+
+  const restored = load();
+  if (restored) $("saved").innerHTML = "<b>Welcome back</b> — we picked up where you left off.";
+
+  // Re-apply conditional visibility after a restore
+  if (chips.pricing_policy === "Ranges only") $("f-ranges").style.display = "block";
+  $("add-svc").disabled = $("svc-grid").children.length >= 6;
+
+  goto(step);
+}
+
+init();
+</script>
+</body>
+</html>

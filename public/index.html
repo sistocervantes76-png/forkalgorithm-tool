@@ -242,8 +242,8 @@ body{font-family:'Outfit',sans-serif;background:#d4c4a8;color:var(--ink);min-hei
 
 </div>
 <script>
-// ── CONFIG — replace with your Cloudflare Worker URL after deploying ──
-const WORKER_URL = "https://forkalgorithm-tool.sistocervantes76.workers.dev/";
+// ── CONFIG — the page and the API now live on the same Worker, so a relative path works ──
+const WORKER_URL = "/api/generate";
 
 // ── State ──
 let mode = "gen", cuisine = "", tips = [], bottleneck = "";

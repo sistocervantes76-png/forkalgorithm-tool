@@ -14,6 +14,11 @@ function corsHeaders() {
 
 export default {
   async fetch(request, env) {
+    const { pathname } = new URL(request.url);
+    if (pathname !== "/api/generate") {
+      return new Response("Not found", { status: 404 });
+    }
+
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders() });
     }

@@ -34,23 +34,45 @@ better-written ads.
 
 ## Part 1 — The Sheet
 
-Your scenario already points at the **`Content`** tab of the `Leads (Responses)`
-spreadsheet, which currently runs:
+The scenario points at the **`Content`** tab of the `Leads (Responses)`
+spreadsheet. That tab is not worth salvaging:
 
-> Timestamp · Category · Segment · Facebook · Linkedin · Image Link ·
-> Instagram · Image Link · Pinterest · Status
+- The blueprint's cached spec expects `Timestamp · Category · Segment ·
+  Facebook · Linkedin · …`, but the live sheet no longer has `Category` or
+  `Segment` — so every column after them shifted left and all the positional
+  mappings now point at the wrong columns.
+- Two different columns are both called `Image Link`, and two are called
+  `status`.
+- It's an *output-only* layout. There is nowhere to put raw material, which is
+  why the agent has to invent the subject of every post.
 
-That's an *output* layout — columns the scenario writes into. There's nowhere
-for you to put the raw material, which is why the agent has to invent the
-subject of every post from a hardcoded instruction.
+**Start a new tab instead.** Same spreadsheet, so the same Google connection
+works and the old `Content` tab stays as history. Every mapping gets rewritten
+against the new layout, so the scrambled positions stop mattering.
 
-**Add the input columns to the RIGHT of your last used column — never to the
-left.** The scenario addresses columns by position, not by name
-(`useColumnHeaders` is off, so mappings read `{{2.`3`}}` meaning "column D").
-Inserting a column on the left shifts every one of those and silently breaks
-all of them. Appending on the right leaves them all valid.
+### Tab name: `Posts`
 
-The agent reads one row per run.
+| Col | Idx | Name | Who fills it |
+|-----|-----|------|--------------|
+| A | 0 | `id` | you |
+| B | 1 | `status` | you set `ready`; scenario sets `posted` |
+| C | 2 | `pillar` | you |
+| D | 3 | `seed` | you — **the important one** |
+| E | 4 | `detail` | you |
+| F | 5 | `takeaway` | you |
+| G | 6 | `audience` | you |
+| H | 7 | `cta` | you |
+| I | 8 | `facebook_post` | scenario |
+| J | 9 | `linkedin_post` | scenario |
+| K | 10 | `first_comment` | scenario |
+| L | 11 | `image_prompt` | scenario |
+| M | 12 | `posted_at` | scenario |
+
+You fill **A–H**. The scenario writes **I–M** and flips `status` to `posted`
+so the row is never picked twice.
+
+Headers go in row 1, exactly as spelled above — lowercase, underscores. The
+agent reads one row per run.
 
 | Col | Name | What goes in it | Example |
 |-----|------|-----------------|---------|
@@ -257,15 +279,11 @@ instead of a guess.
 
 #### Step 1 — you, in the Make UI
 
-**a. Add the seed columns.** On the `Content` tab, find your last used column
-and put these in the next six empty ones, to the right:
+**a. Make the `Posts` tab.** In `Leads (Responses)`, add a new tab named
+`Posts` and put the 13 headers from Part 1 in row 1. Leave `Content` alone.
 
-`pillar` · `seed` · `detail` · `takeaway` · `audience` · `cta`
-
-Check column K first — one export showed a stray `status` header there. If it's
-unused, overwrite it; if you're using it, just start the six columns after it.
-**Write down which letters they land on** (e.g. "K through P") — I need that to
-write the mappings.
+Then fill one test row: `id` = 1, `status` = `ready`, and columns C–H with a
+real seed. Leave I–M empty.
 
 **b. Add the trigger module.** Click the small **+** at the very start of the
 flow, left of the agent → **Google Sheets** → **Search Rows**. Configure:
@@ -274,10 +292,10 @@ flow, left of the agent → **Google Sheets** → **Search Rows**. Configure:
 |---|---|
 | Connection | your existing Google connection |
 | Spreadsheet | `Leads (Responses)` |
-| Sheet Name | `Content` |
+| Sheet Name | `Posts` |
 | Table contains headers | Yes |
 | Use column headers as IDs | **No** ← must be No |
-| Filter | `Status` **Equal to** `ready` |
+| Filter | `status` **Equal to** `ready` |
 | Maximum number of returned rows | `1` |
 
 "Use column headers as IDs" being **No** is the one that matters. The existing

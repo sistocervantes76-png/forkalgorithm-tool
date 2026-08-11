@@ -246,10 +246,16 @@ function buildForm() {
   var ss = SpreadsheetApp.create(SHEET_NAME);
   form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
 
+  // Re-open so the "Form Responses 1" sheet Google just added is visible to us.
+  ss = SpreadsheetApp.openById(ss.getId());
+
   var tab = ss.insertSheet(NORMALIZED_TAB);
-  tab.appendRow(HEADERS);
-  tab.setFrozenRows(1);
-  tab.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
+  writeHeaders(tab);
+
+  // A brand new spreadsheet ships with an empty "Sheet1". Now that the responses
+  // sheet and our tidy tab exist, drop it so you aren't left with a blank tab.
+  var stray = ss.getSheetByName('Sheet1');
+  if (stray && ss.getSheets().length > 1) ss.deleteSheet(stray);
 
   PropertiesService.getScriptProperties().setProperty('SHEET_ID', ss.getId());
 
@@ -324,17 +330,32 @@ function onFormSubmit(e) {
 
   var ss = SpreadsheetApp.openById(sheetId);
   var tab = ss.getSheetByName(NORMALIZED_TAB) || ss.insertSheet(NORMALIZED_TAB);
-  if (tab.getLastRow() === 0) {
-    tab.appendRow(HEADERS);
-    tab.setFrozenRows(1);
-  }
+  if (tab.getLastRow() === 0) writeHeaders(tab);
 
   var answers = readAnswers(e.response);
   var row = [];
   for (var i = 0; i < HEADERS.length; i++) {
     row.push(answers[HEADERS[i]] === undefined ? '' : answers[HEADERS[i]]);
   }
+  ensureColumns(tab, HEADERS.length);
   tab.appendRow(row);
+}
+
+
+function writeHeaders(tab) {
+  ensureColumns(tab, HEADERS.length);
+  tab.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold');
+  tab.setFrozenRows(1);
+}
+
+
+/**
+ * A new sheet only has 26 columns and we write 64, which would otherwise fail
+ * with "the number of columns in the data does not match the range".
+ */
+function ensureColumns(tab, needed) {
+  var have = tab.getMaxColumns();
+  if (have < needed) tab.insertColumnsAfter(have, needed - have);
 }
 
 

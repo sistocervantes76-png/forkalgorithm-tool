@@ -15,9 +15,20 @@ response spreadsheet, in one go.
 **1. Open the script editor.** Go to [script.google.com](https://script.google.com) and click
 **New project**. You'll get a mostly-empty code window with `function myFunction() {}` in it.
 
-**2. Paste the script in.** Select everything in that window and delete it. Open
-`tools/create-onboarding-form.gs` from this repo, copy the whole file, and paste it in. Give
-the project a name at the top — "Fork Algorithm onboarding" works.
+**2. Paste the script in.** Select everything in that window and delete it, then copy the whole
+of `tools/create-onboarding-form.gs` and paste it in. Give the project a name at the top —
+"Fork Algorithm onboarding" works.
+
+The easiest place to copy it from is the raw file, which is always the current version and is
+plain text with nothing to mangle the code:
+
+```
+https://raw.githubusercontent.com/sistocervantes76-png/forkalgorithm-tool/claude/onboarding-text-missed-calls-p18tkr/tools/create-onboarding-form.gs
+```
+
+Open that, select all, copy. (After this branch merges, swap
+`claude/onboarding-text-missed-calls-p18tkr` for `main` in that link.) Don't keep a copy in a
+Google Doc — it goes out of date the moment the script changes, and you'd have no way to tell.
 
 **3. Run it.** In the toolbar there's a dropdown showing a function name. Choose **buildForm**,
 then click **Run**.

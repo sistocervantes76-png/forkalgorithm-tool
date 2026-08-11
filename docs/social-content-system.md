@@ -12,10 +12,15 @@ The scenario wiring does not change. Two things change:
 
 ## Why the current posts don't get clicks
 
-Ad-mode posts are generated from a *topic*. "Write a post about missed-call
-automation for restaurants" produces something true, generic, and skippable —
-because a thousand accounts could have written it. There is no reason to
-follow the person who posted it.
+The current instructions tell the agent to find a bottleneck, show the
+financial loss ("Agitation"), feature a trending product, bridge to Fork
+Algorithm, and drive to the site. That is a competent ad. It is structurally
+an ad, and it will read as one no matter how good the writing gets.
+
+Ad-mode posts are generated from a *topic*. "Find a bottleneck in the roofing
+industry" produces something true, generic, and skippable — because a thousand
+accounts could have written it. There is no reason to follow the person who
+posted it.
 
 Personal-brand posts are generated from a *fact only you know*. Twenty years
 on restaurant floors, South Beach, Darden, lawn crews, pools, trees. That
@@ -29,7 +34,18 @@ better-written ads.
 
 ## Part 1 — The Sheet
 
-Make a new tab called `content_seeds`. The Gemini module reads one row per run.
+Your scenario already points at the **`Content`** tab of the `Leads (Responses)`
+spreadsheet, which currently runs:
+
+> Timestamp · Category · Segment · Facebook · Linkedin · Image Link ·
+> Instagram · Image Link · Pinterest · Status
+
+That's an *output* layout — columns the scenario writes into. There's nowhere
+for you to put the raw material, which is why the agent has to invent the
+subject of every post from a hardcoded instruction.
+
+Add these input columns to the left of the existing ones (or start a clean tab
+and keep the old one for history). The agent reads one row per run.
 
 | Col | Name | What goes in it | Example |
 |-----|------|-----------------|---------|
@@ -95,11 +111,14 @@ that all ask, because by then you've earned it.
 
 ---
 
-## Part 3 — The Gemini prompt
+## Part 3 — The prompt
 
-Paste this into the Gemini module in Make, replacing the current prompt.
-Swap `{{seed}}`, `{{detail}}` etc. for your actual module mappings — if your
-Sheets module is module 2, they become `{{2.seed}}`, `{{2.detail}}`, and so on.
+Goes in the **Instructions** box of the AI Agent module (module 3,
+"Lead Qualification Agent") — replacing what's there now.
+
+Swap `{{seed}}`, `{{detail}}` etc. for your actual module mappings once the
+Sheets trigger is wired up (see Part 4). Until then you can paste a seed
+directly into the **Input** field to test.
 
 ```
 You are writing a social post AS Sisto Cervantes. First person. You are not
@@ -156,39 +175,136 @@ NEVER
 - Never write "As someone who..." or "I've seen firsthand".
 
 LENGTH
-- facebook: 60–120 words
-- linkedin: 100–180 words, line breaks between short paragraphs
-- instagram: 40–80 words
-- pinterest: 30–50 words, plainly descriptive
+- facebook_post_text: 60–120 words
+- linkedin_post_text: 100–180 words, blank line between short paragraphs
+
+FACEBOOK VS LINKEDIN
+These are two different posts about the same seed, not one post copied twice.
+Facebook is the parking-lot version: looser, funnier, more personal.
+LinkedIn is the same story told to other owners and operators: same voice,
+slightly tighter, the takeaway carries a bit more weight. Neither one is
+corporate. If the two drafts could be swapped without anyone noticing, you
+have written them wrong.
 
 OUTPUT
-Return valid JSON only, no markdown fences:
-{
-  "caption": "the post text",
-  "hashtags": "3 to 5 lowercase hashtags, space separated, no generic ones
-   like #business or #entrepreneur",
-  "first_comment": "if CTA mode is tool or book, the link goes here with one
-   short line of context. Otherwise empty string.",
-  "image_prompt": "one sentence describing a photo that matches this post —
-   real, unstaged, work-in-progress. Never a stock-photo handshake or a
-   person at a laptop."
-}
+Fill every field in the response structure. Do not wrap anything in markdown
+fences. If a field does not apply, return an empty string rather than
+inventing content for it.
 ```
 
 ---
 
-## Part 4 — Two changes in the scenario
+## Part 4 — Fixes needed in the scenario
 
-**1. Parse the JSON.** Add a *JSON → Parse JSON* module right after Gemini,
-before the Router. Then map `caption`, `hashtags`, `first_comment`, and
-`image_prompt` to the platform modules separately. Right now you're likely
-posting the raw AI output as one blob.
+Read from the exported blueprint of **"Lead Qualification Agent (copy)"**.
+Some of these are the personal-brand pivot; some are bugs that are breaking
+the scenario right now regardless of what the prompt says.
 
-**2. Put links in the first comment, not the post.** Facebook and LinkedIn
-both suppress reach on posts containing outbound links. Post the caption
-clean, then add a second module that comments on your own post with
-`first_comment`. This alone usually moves click numbers more than the copy
-does, because the post actually gets shown.
+### 4.1 — LinkedIn is posting the Facebook copy *(bug)*
+
+Module 19 (LinkedIn → Create a Post) maps:
+
+```
+content: {{3.jsonResponse.facebook_post_text}}
+```
+
+The instructions ask the model for a LinkedIn post with a different tone, but
+there is no LinkedIn field in the response structure, so LinkedIn receives the
+Facebook text verbatim. Two platforms, one identical post.
+
+**Fix:** add the fields below to the AI Agent's **Response structure**, then
+change module 19's Content mapping to `{{3.jsonResponse.linkedin_post_text}}`.
+
+### 4.2 — Response structure
+
+Current fields are `icp_match_score`, `icp_match_reason`, and
+`facebook_post_text`. The first two are leftovers from the lead-qualification
+scenario this was copied from — nothing downstream reads them, so the model is
+spending effort scoring an ICP that no module consumes.
+
+Delete those two. Set the structure to:
+
+| Name | Type | Description |
+|------|------|-------------|
+| `facebook_post_text` | text, multiline | The Facebook post. |
+| `linkedin_post_text` | text, multiline | The LinkedIn post — same seed, different telling. Not a copy. |
+| `first_comment` | text, multiline | Link + one line of context, for CTA modes `tool` and `book`. Empty otherwise. |
+| `image_prompt` | text | One sentence describing a real, unstaged photo. Never a stock handshake or a person at a laptop. |
+| `pillar_used` | text | Which of the five pillars this came from. For your own tracking. |
+
+### 4.3 — The Sheets write-back is broken *(bug)*
+
+Both Google Sheets "Update a Row" modules (10 and 27) map from `{{2.*}}` —
+including `rowNumber: {{2.__ROW_NUMBER__}}`. **Module 2 does not exist in the
+scenario.** Make already flags this on both:
+
+> 'Google Sheets - Update a Row' [module ID 10] references non-existing
+> module [module ID 2].
+
+Module 2 was the Sheets trigger in the scenario this was copied from, and it
+didn't come across. So every run either fails at the write-back or updates
+nothing, and the `Status` column never advances.
+
+**Fix:** add a Google Sheets **Search Rows** module at the front of the flow,
+pointed at the `Content` tab of the `Leads (Responses)` spreadsheet
+(`1C-2bEj-128eVy1oru7h7Fc9XvfdQj_b3x1FbPsXavos`), filtered to rows where
+Status is `ready`, limit 1. Then re-map both update modules to it.
+
+This is also what makes the story-seed system in Parts 1–2 actually work — the
+seed comes from the row instead of from the hardcoded Input.
+
+I'd treat this as its own sitting, separate from the prompt swap. Tell me when
+you want to do it and I'll walk it through step by step.
+
+### 4.4 — The Input is hardcoded to roofing
+
+Module 3's **Input** field is:
+
+> `Find a current operational bottleneck in the roofing industry and select a trending product.`
+
+Every single run is about roofing. Once 4.3 is done, map this to the seed
+column instead. Until then, paste a different seed in by hand to test.
+
+### 4.5 — The Web Search tool is pointed at the wrong industry
+
+The Web Search tool's prompt describes "an expert Market Intelligence Agent
+specializing in the culinary creator space" and asks it to enrich lead
+profiles for ICP matching — another leftover.
+
+For personal-brand content you mostly don't want web search running at all:
+the material comes from your seed, not the internet. Either remove the tool
+from the agent, or replace its prompt with something narrow:
+
+```
+Only use this tool when the post needs a fact checked — a date, a name, a
+number, an industry term. Return the fact and nothing else. Never return
+marketing copy, trend reports, or product recommendations.
+```
+
+### 4.6 — Put links in the first comment, not the post
+
+Facebook and LinkedIn both suppress reach on posts containing outbound links.
+Post the caption clean, then add a module that comments on your own post with
+`first_comment`. This usually moves click numbers more than the copy does,
+because the post actually gets shown.
+
+### 4.7 — Small ones
+
+- The MCP Tools module (8) shows a setup error: *"MCP server: Value must not
+  be empty."* It'll fail if the agent tries to call it.
+- Module 32 (`FunctionIncrement`) increments a counter nothing reads. Harmless,
+  but it's dead weight — it was probably the row cursor in the original.
+- Rename the scenario. It posts social content; it's still called
+  "Lead Qualification Agent (copy)".
+
+### Order I'd do them in
+
+1. **4.1 + 4.2** — prompt and response structure. Biggest change, lowest risk,
+   about ten minutes. This alone gets you personal-brand posts and stops
+   LinkedIn duplicating Facebook.
+2. **4.5 + 4.7** — quick cleanup.
+3. **4.3 + 4.4** — the Sheets rebuild. Do this when you have an hour.
+4. **4.6** — once the rest is stable.
 
 ---
 

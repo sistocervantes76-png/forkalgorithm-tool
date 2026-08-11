@@ -44,8 +44,13 @@ That's an *output* layout — columns the scenario writes into. There's nowhere
 for you to put the raw material, which is why the agent has to invent the
 subject of every post from a hardcoded instruction.
 
-Add these input columns to the left of the existing ones (or start a clean tab
-and keep the old one for history). The agent reads one row per run.
+**Add the input columns to the RIGHT of your last used column — never to the
+left.** The scenario addresses columns by position, not by name
+(`useColumnHeaders` is off, so mappings read `{{2.`3`}}` meaning "column D").
+Inserting a column on the left shifts every one of those and silently breaks
+all of them. Appending on the right leaves them all valid.
+
+The agent reads one row per run.
 
 | Col | Name | What goes in it | Example |
 |-----|------|-----------------|---------|
@@ -245,16 +250,65 @@ Module 2 was the Sheets trigger in the scenario this was copied from, and it
 didn't come across. So every run either fails at the write-back or updates
 nothing, and the `Status` column never advances.
 
-**Fix:** add a Google Sheets **Search Rows** module at the front of the flow,
-pointed at the `Content` tab of the `Leads (Responses)` spreadsheet
-(`1C-2bEj-128eVy1oru7h7Fc9XvfdQj_b3x1FbPsXavos`), filtered to rows where
-Status is `ready`, limit 1. Then re-map both update modules to it.
+**Fix — done as a two-step round trip.** The module has to be added through
+Make's own picker rather than hand-written into the blueprint, so that the
+module identifier, version, and connection are whatever Make actually expects
+instead of a guess.
 
-This is also what makes the story-seed system in Parts 1–2 actually work — the
-seed comes from the row instead of from the hardcoded Input.
+#### Step 1 — you, in the Make UI
 
-I'd treat this as its own sitting, separate from the prompt swap. Tell me when
-you want to do it and I'll walk it through step by step.
+**a. Add the seed columns.** On the `Content` tab, find your last used column
+and put these in the next six empty ones, to the right:
+
+`pillar` · `seed` · `detail` · `takeaway` · `audience` · `cta`
+
+Check column K first — one export showed a stray `status` header there. If it's
+unused, overwrite it; if you're using it, just start the six columns after it.
+**Write down which letters they land on** (e.g. "K through P") — I need that to
+write the mappings.
+
+**b. Add the trigger module.** Click the small **+** at the very start of the
+flow, left of the agent → **Google Sheets** → **Search Rows**. Configure:
+
+| Field | Value |
+|---|---|
+| Connection | your existing Google connection |
+| Spreadsheet | `Leads (Responses)` |
+| Sheet Name | `Content` |
+| Table contains headers | Yes |
+| Use column headers as IDs | **No** ← must be No |
+| Filter | `Status` **Equal to** `ready` |
+| Maximum number of returned rows | `1` |
+
+"Use column headers as IDs" being **No** is the one that matters. The existing
+update modules address columns by number, and this keeps the trigger's output
+in that same numbered form.
+
+**c. Export and send it to me.** ⋯ → **Export Blueprint** → paste it here.
+
+#### Step 2 — me
+
+Make will assign the new module some ID (36, 37, whatever) — not 2. So I take
+your export and:
+
+- rewrite every `{{2.*}}` reference in modules 10 and 27 to the real ID
+- map the agent's `{{pillar}}`, `{{seed}}`, `{{detail}}`, `{{takeaway}}`,
+  `{{audience}}`, `{{cta}}` onto the actual column numbers your seeds landed on
+- swap the hardcoded Input for the mapped seed
+- fix the two write-back bugs below
+- send it back to import
+
+#### Two write-back bugs to fix while we're in there
+
+**Status never advances.** Module 10 writes column 9 (Status) as `{{2.`9`}}` —
+it reads the old value and writes the same value back. A row marked `ready`
+stays `ready` forever, so the scenario will pick the same row every run. It
+should write the literal `posted`.
+
+**Category gets clobbered.** Module 10 writes column 1 (Category, B) from
+`{{2.`7`}}` (Image Link, H). Every run copies an image link into your Category
+column. Almost certainly a leftover from the copy — I'll drop that mapping
+unless you tell me it's deliberate.
 
 ### 4.4 — The Input is hardcoded to roofing
 

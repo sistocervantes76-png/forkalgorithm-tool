@@ -61,6 +61,19 @@ npm run deploy        # tsc + vite build, then wrangler deploy
 
 Wrangler prints the URL (`https://fork-command-center.<subdomain>.workers.dev`). To use your own domain, add a route or custom domain in the Cloudflare dashboard (e.g. `command.forkalgorithm.com`).
 
+## 4b. Or deploy automatically from GitHub (Workers Builds)
+
+The recipe site's Cloudflare build only deploys the repository root. The Command Center needs its own Workers Builds connection:
+
+1. Cloudflare dashboard → **Workers & Pages → Create → Import a repository** → pick `forkalgorithm-tool`.
+2. **Project name:** `fork-command-center` (must match `name` in `wrangler.toml`).
+3. **Advanced settings → Root directory:** `command-center`
+4. **Build command:** `npm run build`
+5. **Deploy command:** `npx wrangler d1 migrations apply fork-command-center --remote && npx wrangler deploy`
+6. Under **Build watch paths**, include `command-center/*` so recipe-site changes don't redeploy it (and exclude `command-center/*` on the `forkalgorithm-tool` Worker).
+
+Set the secrets from step 3 on the `fork-command-center` Worker (**Settings → Variables and Secrets**) after the first deploy.
+
 ## 5. Recommended: put Cloudflare Access in front
 
 The app has its own sign-in, RBAC and rate limiting. For a founder-only tool, also add a **Cloudflare Zero Trust → Access** application on the hostname, restricted to your email. Exclude only `/api/webhooks/make` and `/api/worker/*` with a bypass policy, because Make.com and external workers can't complete an Access login. Both of those paths authenticate with their own secrets.

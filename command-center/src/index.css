@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+
+  --color-emerald-950: #06281e;
+  --color-emerald-900: #0a3d2e;
+  --color-emerald-800: #0d5240;
+  --color-emerald-700: #0f6b4f;
+  --color-emerald-600: #13845f;
+  --color-emerald-500: #1f9d72;
+  --color-emerald-100: #d5ebe0;
+  --color-emerald-50: #ebf5ef;
+
+  --color-creme: #faf5ea;
+  --color-creme-2: #f3ebda;
+  --color-creme-3: #e9dec6;
+
+  --color-tan: #c4a276;
+  --color-tan-light: #e6d5b8;
+  --color-tan-dark: #8f6e43;
+
+  --color-charcoal: #1e2320;
+  --color-charcoal-2: #2a312d;
+  --color-charcoal-3: #3a423d;
+  --color-ink: #1e2320;
+  --color-ink-2: #4a524c;
+  --color-ink-3: #6f766f;
+
+  --color-ok: #146c43;
+  --color-warn: #8a5a00;
+  --color-bad: #a8261b;
+  --color-info: #1f5c99;
+}
+
+html, body, #root { height: 100%; }
+body {
+  overflow-wrap: break-word;
+  @apply bg-creme text-ink font-sans antialiased;
+}
+:focus-visible { outline: 2px solid var(--color-emerald-600); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

@@ -1,0 +1,29 @@
+# Fork Algorithm — Agent Command Center
+# Separate Worker from the public recipe site (../wrangler.toml).
+name = "fork-command-center"
+main = "worker/index.ts"
+compatibility_date = "2026-07-13"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fork-command-center"
+# Replace with the id printed by `wrangler d1 create fork-command-center`.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+# Chief of Staff housekeeping: every 15 min (stuck-task recovery, due schedules)
+# and Friday 21:00 UTC (weekly CEO briefing). Times are UTC.
+[triggers]
+crons = ["*/15 * * * *", "0 21 * * 5"]
+
+[vars]
+APP_ENV = "production"
+# Non-secret configuration. Secrets go in `wrangler secret put` — see DEPLOYMENT.md.
+OWNER_EMAIL = ""

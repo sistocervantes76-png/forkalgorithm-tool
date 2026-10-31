@@ -1,3 +1,5 @@
+# Fork Algorithm recipe site: the only Wrangler config for the repository root.
+# The Agent Command Center is a separate Worker configured in command-center/wrangler.toml.
 name = "forkalgorithm-tool"
 main = "worker.js"
 compatibility_date = "2026-07-13"
@@ -5,3 +7,6 @@ compatibility_date = "2026-07-13"
 [assets]
 directory = "./public"
 binding = "ASSETS"
+
+[observability]
+enabled = true

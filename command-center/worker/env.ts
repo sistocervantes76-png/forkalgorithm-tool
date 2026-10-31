@@ -1,0 +1,22 @@
+export interface Env {
+  DB: D1Database;
+  ASSETS: Fetcher;
+  APP_ENV?: string;
+
+  // Auth
+  OWNER_EMAIL?: string;
+  OWNER_PASSWORD?: string;
+  WORKER_TOKEN?: string;
+
+  // Integrations — each is optional; missing secrets mean "disconnected".
+  ANTHROPIC_API_KEY?: string;
+  MAKE_WEBHOOK_SECRET?: string;
+  MAKE_OUTBOUND_WEBHOOK_URL?: string;
+  STRIPE_SECRET_KEY?: string;
+  RINGCENTRAL_CLIENT_ID?: string;
+  RINGCENTRAL_CLIENT_SECRET?: string;
+  RINGCENTRAL_JWT?: string;
+  RINGCENTRAL_SERVER_URL?: string;
+  GOOGLE_SERVICE_ACCOUNT_JSON?: string;
+  GOOGLE_SHEETS_ID?: string;
+}

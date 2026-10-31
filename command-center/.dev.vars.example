@@ -1,0 +1,15 @@
+# Copy to .dev.vars for local development. These values are for LOCAL use only
+# (the test suite expects them). Never reuse them in production.
+OWNER_EMAIL=founder@example.com
+OWNER_PASSWORD=local-dev-password-123
+WORKER_TOKEN=local-worker-token-abcdef
+# Optional integrations — leave unset to keep them in the "disconnected" state.
+# ANTHROPIC_API_KEY=
+MAKE_WEBHOOK_SECRET=local-make-secret
+# MAKE_OUTBOUND_WEBHOOK_URL=
+# STRIPE_SECRET_KEY=
+# RINGCENTRAL_CLIENT_ID=
+# RINGCENTRAL_CLIENT_SECRET=
+# RINGCENTRAL_JWT=
+# GOOGLE_SERVICE_ACCOUNT_JSON=
+# GOOGLE_SHEETS_ID=

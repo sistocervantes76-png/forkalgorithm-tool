@@ -16,7 +16,7 @@ npx wrangler login
 npx wrangler d1 create fork-command-center
 ```
 
-Copy the printed `database_id` into `wrangler.toml` (replace the `00000000-…` placeholder), then apply the schema and seed:
+Copy the printed `database_id` into `wrangler.toml` (the current value points at the production database already created for this project), then apply the schema and seed:
 
 ```bash
 npm run db:migrate:remote
@@ -35,7 +35,7 @@ npx wrangler secret put OWNER_PASSWORD     # long, unique passphrase
 npx wrangler secret put WORKER_TOKEN       # e.g. `openssl rand -base64 32`
 ```
 
-Set `OWNER_EMAIL` in `wrangler.toml` under `[vars]` (or as a secret). Signing in with that email and `OWNER_PASSWORD` creates or refreshes the single **owner** account. Add other users (admin, operator, viewer) in **Settings → Users & roles**.
+Set `OWNER_EMAIL` as a secret (`npx wrangler secret put OWNER_EMAIL`) or as a variable in the dashboard; `keep_vars = true` in `wrangler.toml` keeps dashboard variables across deploys. Signing in with that email and `OWNER_PASSWORD` creates or refreshes the single **owner** account. Add other users (admin, operator, viewer) in **Settings → Users & roles**.
 
 **Optional — add each only when you have the access. Until then the integration shows as Disconnected.**
 

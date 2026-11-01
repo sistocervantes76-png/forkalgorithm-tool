@@ -6,7 +6,7 @@ import { requireWorkerToken } from "./auth";
 import { HttpError, audit, clientIp, hmacSha256Hex, json, newId, nowIso, rateLimit, readJson, safeEqual } from "./lib";
 import { bool, int, isoDate, oneOf, reqStr, str } from "./validate";
 import { addLog, claimTask, completeTask, createTask, failTask, getAgent, getTask, raiseAlert } from "./tasks";
-import { PRIORITIES } from "../shared/domain";
+import { AUDIENCE_KEYS, CONTENT_LANE_KEYS, PRIORITIES, TASK_KINDS } from "../shared/domain";
 import { weekStart } from "./briefing";
 
 export async function handleExternal(req: Request, env: Env, path: string): Promise<Response | null> {
@@ -36,7 +36,8 @@ export async function handleExternal(req: Request, env: Env, path: string): Prom
       .bind(agent.id, nowIso())
       .all<{ id: string }>();
     for (const c of candidates.results) {
-      const claimed = await claimTask(env, c.id, actor, lease);
+      // A task whose approval no longer covers it is skipped, never executed.
+      const claimed = await claimTask(env, c.id, actor, lease).catch(() => null);
       if (claimed) return json({ task: claimed });
     }
     return json({ task: null });
@@ -49,7 +50,10 @@ export async function handleExternal(req: Request, env: Env, path: string): Prom
       description: str(body, "description", { optional: true, max: 8000 }),
       agent_id: str(body, "assign_to", { optional: true, max: 80 }) ?? agent.id,
       priority: oneOf(body, "priority", PRIORITIES, true),
-      kind: oneOf(body, "kind", ["general", "draft", "research", "outreach", "report", "financial", "access"], true),
+      kind: oneOf(body, "kind", TASK_KINDS, true),
+      content_lane: oneOf(body, "content_lane", CONTENT_LANE_KEYS, true),
+      audience: oneOf(body, "audience", AUDIENCE_KEYS, true),
+      evidence_ref: str(body, "evidence_ref", { optional: true, max: 40 }),
       idempotency_key: str(body, "idempotency_key", { optional: true, max: 120 }),
       parent_task_id: str(body, "parent_task_id", { optional: true, max: 40 }) ?? null,
       propose_only: true,

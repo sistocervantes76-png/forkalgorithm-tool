@@ -1,8 +1,9 @@
-// Weekly CEO briefing. Facts are aggregated from real records only (is_demo = 0).
+// Weekly CEO review. Facts are aggregated from real records only (is_demo = 0).
 // An AI narrative is added only when Atlas is configured with a working provider.
+// The review day, hour and time zone are settings (default Friday 16:00 New York).
 import type { Env } from "./env";
 import { audit, newId, nowIso, parseJsonField } from "./lib";
-import { briefingNarrative, canExecuteInWorker, executeTask } from "./executor";
+import { briefingNarrative, canExecuteInWorker, executeTask, executionReadiness } from "./executor";
 import { raiseAlert, recoverStuckTasks, type AgentRow } from "./tasks";
 import { pruneRateLimits } from "./lib";
 
@@ -37,6 +38,22 @@ export async function buildBriefingFacts(env: Env, weekOf: string) {
     db.prepare("SELECT verdict, COUNT(*) AS n FROM feedback WHERE created_at >= ? AND created_at < ? GROUP BY verdict").bind(from, to).all(),
     db.prepare("SELECT (SELECT COUNT(*) FROM tasks WHERE is_demo = 1) + (SELECT COUNT(*) FROM prospects WHERE is_demo = 1) AS n").first<{ n: number }>(),
   ]);
+  const [verified, invalidated, dispatches, awaitingFeedback, agents] = await Promise.all([
+    db.prepare(
+      `SELECT COUNT(*) AS n FROM task_attempts a JOIN tasks t ON t.id = a.task_id
+       WHERE a.outcome = 'completed' AND t.is_demo = 0 AND a.finished_at >= ? AND a.finished_at < ?`,
+    ).bind(from, to).first<{ n: number }>(),
+    db.prepare("SELECT COUNT(*) AS n FROM approvals WHERE is_demo = 0 AND status = 'invalidated' AND invalidated_at >= ? AND invalidated_at < ?").bind(from, to).first<{ n: number }>(),
+    db.prepare("SELECT status, COUNT(*) AS n FROM task_dispatches WHERE updated_at >= ? AND updated_at < ? GROUP BY status").bind(from, to).all(),
+    db.prepare(
+      `SELECT t.id, t.title, a.name AS agent FROM tasks t LEFT JOIN agents a ON a.id = t.agent_id
+       WHERE t.status = 'completed' AND t.is_demo = 0 AND t.completed_at >= ? AND t.completed_at < ?
+         AND NOT EXISTS (SELECT 1 FROM feedback f WHERE f.target_type = 'task' AND f.target_id = t.id)
+       ORDER BY t.completed_at DESC LIMIT 20`,
+    ).bind(from, to).all(),
+    db.prepare("SELECT * FROM agents WHERE archived = 0 ORDER BY is_core DESC, name").all<AgentRow>(),
+  ]);
+  const readiness = await Promise.all(agents.results.map(async (a) => ({ agent: a.name, ...(await executionReadiness(env, a)) })));
 
   return {
     week_of: weekOf,
@@ -52,6 +69,12 @@ export async function buildBriefingFacts(env: Env, weekOf: string) {
     workflow_runs_this_week: runs,
     recommendations_this_week: recs.results,
     founder_feedback_this_week: feedback.results,
+    verified_executions_this_week: verified?.n ?? 0,
+    verified_executions_note: (verified?.n ?? 0) === 0 ? "No verified executions yet" : null,
+    approvals_invalidated_this_week: invalidated?.n ?? 0,
+    dispatches_this_week: dispatches.results,
+    results_awaiting_your_feedback: awaitingFeedback.results,
+    agent_readiness: readiness.map((r) => ({ agent: r.agent, ready: r.ready, summary: r.summary })),
   };
 }
 
@@ -95,6 +118,57 @@ export function withinSchedule(scheduleJson: string, now = new Date()): boolean 
   return (!s.start || hm >= s.start) && (!s.end || hm < s.end);
 }
 
+// ---------------------------------------------------------------- review schedule
+
+export interface ReviewSchedule {
+  day: string; // sunday … saturday
+  hour: number; // local hour, 0-23
+  timezone: string;
+}
+
+export async function reviewSchedule(env: Env): Promise<ReviewSchedule> {
+  const rows = await env.DB.prepare("SELECT key, value FROM settings WHERE key IN ('briefing.day','briefing.hour_local','briefing.timezone')").all<{ key: string; value: string }>();
+  const m = new Map(rows.results.map((r) => [r.key, parseJsonField<unknown>(r.value, null)]));
+  return {
+    day: typeof m.get("briefing.day") === "string" ? (m.get("briefing.day") as string) : "friday",
+    hour: Number.isInteger(m.get("briefing.hour_local")) ? (m.get("briefing.hour_local") as number) : 16,
+    timezone: typeof m.get("briefing.timezone") === "string" ? (m.get("briefing.timezone") as string) : "America/New_York",
+  };
+}
+
+function localParts(now: Date, tz: string): { weekday: string; hour: number } {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", hour: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  return {
+    weekday: (parts.find((p) => p.type === "weekday")?.value ?? "").toLowerCase(),
+    hour: Number(parts.find((p) => p.type === "hour")?.value ?? 0),
+  };
+}
+
+/** True once the configured review day and hour have arrived (local time). */
+export function reviewIsDue(s: ReviewSchedule, now = new Date()): boolean {
+  try {
+    const p = localParts(now, s.timezone);
+    return p.weekday === s.day && p.hour >= s.hour;
+  } catch {
+    return false;
+  }
+}
+
+/** Next time the review is due, as an ISO timestamp (scans hour by hour; at most 8 days). */
+export function nextReviewDate(s: ReviewSchedule, now = new Date()): string | null {
+  const start = new Date(Math.ceil(now.getTime() / 3600_000) * 3600_000);
+  for (let h = 0; h < 24 * 8; h++) {
+    const t = new Date(start.getTime() + h * 3600_000);
+    try {
+      const p = localParts(t, s.timezone);
+      if (p.weekday === s.day && p.hour === s.hour) return t.toISOString();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------- cron entry point
 
 export async function runScheduled(env: Env, cron: string): Promise<void> {
@@ -103,8 +177,10 @@ export async function runScheduled(env: Env, cron: string): Promise<void> {
   await pruneRateLimits(env);
   await env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(nowIso()).run();
 
-  // Friday briefing (cron "0 21 * * 5" by default). Skip if one already exists for this week from the schedule.
-  if (cron.trim().endsWith("* * 5")) {
+  // Weekly CEO review on the configured day/hour (default Friday 16:00 America/New_York).
+  // The cron runs every 15 minutes; at most one scheduled review is generated per week.
+  void cron;
+  if (reviewIsDue(await reviewSchedule(env))) {
     const existing = await env.DB.prepare("SELECT id FROM briefings WHERE week_of = ? AND trigger_kind = 'scheduled'").bind(weekStart()).first();
     if (!existing) {
       try {

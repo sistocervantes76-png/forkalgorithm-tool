@@ -3,6 +3,9 @@
 OWNER_EMAIL=founder@example.com
 OWNER_PASSWORD=local-dev-password-123
 WORKER_TOKEN=local-worker-token-abcdef
+OWNER_NAME=Sisto Cervantes
+# The test suite makes many writes per minute; production keeps the default (120).
+WRITE_RATE_LIMIT_PER_MINUTE=1000
 # Optional integrations — leave unset to keep them in the "disconnected" state.
 # ANTHROPIC_API_KEY=
 MAKE_WEBHOOK_SECRET=local-make-secret

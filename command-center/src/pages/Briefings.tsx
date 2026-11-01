@@ -12,8 +12,8 @@ export default function Briefings() {
   return (
     <>
       <PageHeader
-        title="Weekly CEO briefing"
-        subtitle="Generated every Friday at 21:00 UTC from Command Center records (demonstration data excluded). If Atlas is configured with an AI provider, a written narrative is added, built only from those facts."
+        title="Weekly CEO review"
+        subtitle="Atlas reports to you once a week (default Friday; change the day in Settings). Built only from Command Center records, with demonstration data excluded. If Atlas has a verified AI provider, a short narrative is added from those facts only."
         actions={can("admin") && <Button variant="primary" disabled={gen.busy} onClick={() => gen.run(() => api<{ id: string }>("POST", "/api/briefings/generate", {}), "Briefing generated").then((r) => r && (list.reload(), setOpenId(r.id)))}>Generate now</Button>}
       />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[16rem_1fr]">
@@ -92,6 +92,22 @@ function BriefingView({ id }: { id: string }) {
         </Card>
         <Card title="Pipeline">
           {c.pipeline_by_status.length ? <HBarList rows={c.pipeline_by_status.map((p: any) => ({ label: p.status.replaceAll("_", " "), value: p.n }))} /> : <Empty title="No prospects" />}
+        </Card>
+        <Card title="Verified executions & readiness">
+          <p className="text-sm">{c.verified_executions_this_week ? <>Verified executions this week: <strong>{c.verified_executions_this_week}</strong></> : (c.verified_executions_note ?? "No verified executions yet")}</p>
+          {c.approvals_invalidated_this_week > 0 && <p className="mt-1 text-sm">Approvals voided by later changes: <strong>{c.approvals_invalidated_this_week}</strong></p>}
+          {Array.isArray(c.agent_readiness) && (
+            <ul className="mt-2 space-y-0.5 text-xs">
+              {c.agent_readiness.map((r: any) => <li key={r.agent}><Badge tone={r.ready ? "ok" : "neutral"}>{r.ready ? "Ready" : "Not running"}</Badge> {r.agent} <span className="text-ink-3">{r.ready ? "" : r.summary.replace("Not running: ", "")}</span></li>)}
+            </ul>
+          )}
+        </Card>
+        <Card title="Results awaiting your feedback">
+          {c.results_awaiting_your_feedback?.length ? (
+            <ul className="space-y-1 text-sm">{c.results_awaiting_your_feedback.map((t: any) => <li key={t.id}>• {t.title} <span className="text-xs text-ink-3">({t.agent ?? "unassigned"})</span></li>)}</ul>
+          ) : (
+            <Empty title="Nothing waiting" />
+          )}
         </Card>
         <Card title="Workflows & feedback">
           <p className="text-sm">Workflow runs: <strong>{c.workflow_runs_this_week?.total ?? 0}</strong> ({c.workflow_runs_this_week?.failed ?? 0} failed)</p>

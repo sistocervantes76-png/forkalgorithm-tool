@@ -14,18 +14,20 @@ import Briefings from "./pages/Briefings";
 import Alerts from "./pages/Alerts";
 import Settings from "./pages/Settings";
 
+// First-release workspaces first. "Later phase" pages work from real records
+// but are not part of the first-release scope and are kept out of the way.
 const NAV = [
   { path: "/", label: "Overview", icon: "dashboard", el: Overview },
-  { path: "/chief-of-staff", label: "Chief of Staff", icon: "crown", el: ChiefOfStaff },
-  { path: "/agents", label: "Agents", icon: "agents", el: Agents },
+  { path: "/approvals", label: "CEO Approvals", icon: "approval", el: Approvals },
   { path: "/tasks", label: "Tasks", icon: "tasks", el: Tasks },
-  { path: "/approvals", label: "Approvals", icon: "approval", el: Approvals },
-  { path: "/intel", label: "Market & Outreach", icon: "radar", el: Intel },
-  { path: "/workflows", label: "Workflows", icon: "flow", el: Workflows },
-  { path: "/finance", label: "Finance", icon: "finance", el: Finance },
-  { path: "/briefings", label: "CEO Briefings", icon: "briefing", el: Briefings },
-  { path: "/alerts", label: "Alerts & Audit", icon: "bell", el: Alerts },
-  { path: "/settings", label: "Settings", icon: "settings", el: Settings },
+  { path: "/agents", label: "Agents", icon: "agents", el: Agents },
+  { path: "/chief-of-staff", label: "Atlas & Feedback", icon: "crown", el: ChiefOfStaff },
+  { path: "/briefings", label: "Weekly CEO Review", icon: "briefing", el: Briefings },
+  { path: "/alerts", label: "Audit & Alerts", icon: "bell", el: Alerts },
+  { path: "/settings", label: "Settings & Integrations", icon: "settings", el: Settings },
+  { path: "/intel", label: "Market & Outreach", icon: "radar", el: Intel, later: true },
+  { path: "/workflows", label: "Workflows", icon: "flow", el: Workflows, later: true },
+  { path: "/finance", label: "Finance", icon: "finance", el: Finance, later: true },
 ];
 
 const RANK = { viewer: 0, operator: 1, admin: 2, owner: 3 };
@@ -99,6 +101,11 @@ export default function App() {
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar onMenu={() => setNavOpen(true)} title={current.label} />
           <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6 lg:px-8">
+            {"later" in current && current.later && (
+              <div className="mb-4 rounded-lg border border-tan bg-tan-light/40 px-4 py-2.5 text-sm text-tan-dark">
+                <strong>Later-phase workspace.</strong> It shows only real records and connected data, but it is outside the first-release scope and has not been reviewed for daily use yet.
+              </div>
+            )}
             <Page />
           </main>
         </div>
@@ -136,9 +143,10 @@ function Sidebar({ path, navigate, open, onClose, user, onLogout }: { path: stri
           </div>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3" aria-label="Main">
-          {NAV.map((n) => (
+          {NAV.map((n, i) => (
+            <div key={n.path}>
+            {n.later && !NAV[i - 1]?.later && <div className="px-3 pb-1 pt-4 text-[10px] uppercase tracking-widest text-tan">Later phase</div>}
             <a
-              key={n.path}
               href={n.path}
               onClick={(e) => {
                 e.preventDefault();
@@ -151,6 +159,7 @@ function Sidebar({ path, navigate, open, onClose, user, onLogout }: { path: stri
               <span className="flex-1">{n.label}</span>
               {counts[n.path] ? <span className="rounded-full bg-tan px-1.5 text-[11px] font-semibold text-charcoal">{counts[n.path]}</span> : null}
             </a>
+            </div>
           ))}
         </nav>
         <div className="border-t border-charcoal-3 px-4 py-3 text-xs">
@@ -218,7 +227,7 @@ function Login({ onLogin }: { onLogin: (u: AppUser) => void }) {
         <div className="mb-6">
           <div className="text-[11px] uppercase tracking-widest text-tan-dark">Fork Algorithm</div>
           <h1 className="font-display text-2xl text-ink">Agent Command Center</h1>
-          <p className="mt-1 text-sm text-ink-3">Sign in to supervise your Chief of Staff and agent team.</p>
+          <p className="mt-1 text-sm text-ink-3">Founder access. Approvals, tasks and the weekly review for the business behind the public page.</p>
         </div>
         <div className="space-y-3">
           <Field label="Email">

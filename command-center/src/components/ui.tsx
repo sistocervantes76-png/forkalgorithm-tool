@@ -123,10 +123,11 @@ export function StatusPill({ status }: { status: TaskStatus }) {
 
 export function IntegrationPill({ status }: { status: string }) {
   const map: Record<string, [Parameters<typeof Badge>[0]["tone"], string]> = {
-    connected: ["ok", "● Connected"],
-    configured: ["info", "◐ Configured, untested"],
-    error: ["bad", "✕ Error"],
-    disconnected: ["neutral", "○ Disconnected"],
+    connected: ["ok", "● Connected (verified)"],
+    unverified: ["info", "◐ Configured, not verified"],
+    disconnected: ["bad", "✕ Disconnected"],
+    not_configured: ["neutral", "○ Not configured"],
+    demo: ["demo", "Demonstration"],
   };
   const [tone, label] = map[status] ?? ["neutral", status];
   return <Badge tone={tone}>{label}</Badge>;

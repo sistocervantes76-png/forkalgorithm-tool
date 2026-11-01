@@ -1,6 +1,7 @@
 // Generates migrations/0002_seed.sql: departments, the nine core agent
 // profiles and default settings. Run: node scripts/generate-seed.mjs
 // Seeds configuration only — no tasks, results or metrics.
+// Later profile changes (prompts aligned with company positioning) are in migrations/0003; do not regenerate 0002.
 import { writeFileSync } from "node:fs";
 
 const NOW = "2026-10-31T00:00:00.000Z";

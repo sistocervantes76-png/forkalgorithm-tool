@@ -5,10 +5,12 @@ export interface Env {
 
   // Auth
   OWNER_EMAIL?: string;
+  OWNER_NAME?: string; // display name for the founder account, e.g. "Sisto Cervantes"
   OWNER_PASSWORD?: string;
   WORKER_TOKEN?: string;
+  WRITE_RATE_LIMIT_PER_MINUTE?: string; // optional; default 120 writes per user per minute
 
-  // Integrations — each is optional; missing secrets mean "disconnected".
+  // Integrations — each is optional; missing secrets mean "not configured".
   ANTHROPIC_API_KEY?: string;
   MAKE_WEBHOOK_SECRET?: string;
   MAKE_OUTBOUND_WEBHOOK_URL?: string;

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AI_MODELS, AUTONOMY_INFO, AUTONOMY_LEVELS, CAPABILITIES, PRIORITIES, PROVIDERS, type Autonomy } from "../../shared/domain";
 import { api, fmtDate, fmtRelative, useApi, withDemo } from "../api";
 import { AGENT_ICONS, Icon } from "../components/icons";
-import { ACCENTS, AgentAvatar, AuthorityPips, ConnectionBadge, Nameplate, type Agent } from "../components/Nameplate";
+import { ACCENTS, AgentAvatar, AuthorityPips, Nameplate, type Agent, ReadinessBadge, ReadinessChecklist } from "../components/Nameplate";
 import { Badge, Button, Card, DemoBadge, Drawer, Empty, ErrorNote, Field, Input, Loading, PageHeader, Select, StatusPill, Tabs, Textarea, cx, useAction, useApp } from "../components/ui";
 
 export default function Agents() {
@@ -84,11 +84,17 @@ function AgentPanel({ id, departments, onClose }: { id: string; departments: { i
       ) : (
         <>
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <ConnectionBadge connection={a.connection} />
+            <ReadinessBadge agent={a} />
             <Badge>{AUTONOMY_INFO[a.autonomy].label}</Badge>
             <Badge tone="tan">Authority <AuthorityPips level={a.authority_level} /></Badge>
-            <span className="text-xs text-ink-3">Last confirmed execution: {a.last_confirmed_execution_at ? fmtDate(a.last_confirmed_execution_at) : "never"}</span>
+            <span className="text-xs text-ink-3">{a.last_confirmed_execution_at ? `Last verified execution: ${fmtDate(a.last_confirmed_execution_at)}` : "No verified executions yet"}</span>
           </div>
+          {a.readiness && (
+            <div className="mb-4 rounded-xl border border-creme-3 bg-white/80 p-4">
+              <div className="mb-2 text-sm font-semibold">{a.readiness.summary}</div>
+              <ReadinessChecklist readiness={a.readiness} />
+            </div>
+          )}
           <Tabs<TabId>
             value={tab}
             onChange={setTab}

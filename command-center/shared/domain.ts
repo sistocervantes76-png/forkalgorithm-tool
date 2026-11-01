@@ -79,10 +79,59 @@ export const CAPABILITIES = [
 export type CapabilityKey = (typeof CAPABILITIES)[number]["key"];
 
 export const APPROVAL_CATEGORIES = ["general", "outbound_campaign", "financial", "access", "security", "publication"] as const;
+// execution = may this task run at all; release = may this exact result leave the building.
+export const APPROVAL_STAGES = ["execution", "release"] as const;
+export type ApprovalStage = (typeof APPROVAL_STAGES)[number];
 export type ApprovalCategory = (typeof APPROVAL_CATEGORIES)[number];
 
 // Task kinds that ALWAYS require founder approval, regardless of autonomy.
-export const ALWAYS_APPROVE_KINDS = ["outreach", "financial", "access"] as const;
+export const ALWAYS_APPROVE_KINDS = ["outreach", "financial", "access", "publication"] as const;
+
+export const TASK_KINDS = ["general", "draft", "research", "report", "outreach", "publication", "financial", "access"] as const;
+export type TaskKind = (typeof TASK_KINDS)[number];
+
+// ---------------------------------------------------------------- exact actions
+// An approval covers ONE exact action: what happens, where it goes, the exact
+// content and the amount. Changing any of these after approval invalidates it.
+export const ACTION_TYPES = [
+  { key: "internal_draft", label: "Internal draft (nothing leaves the Command Center)", external: false, category: "general", needs: [] },
+  { key: "send_message", label: "Send a message (email / SMS)", external: true, category: "outbound_campaign", needs: ["destination", "action_content"] },
+  { key: "outbound_campaign", label: "Outbound campaign (multiple recipients)", external: true, category: "outbound_campaign", needs: ["destination", "action_content"] },
+  { key: "publish_post", label: "Publish content (Facebook, Instagram, site)", external: true, category: "publication", needs: ["destination", "action_content"] },
+  { key: "update_records", label: "Update business records (Google Sheets / CRM)", external: true, category: "general", needs: ["destination", "action_content"] },
+  { key: "trigger_workflow", label: "Trigger a Make.com scenario", external: true, category: "general", needs: ["destination", "action_content"] },
+  { key: "financial_transaction", label: "Financial transaction (charge, refund, payment)", external: true, category: "financial", needs: ["destination", "action_content", "amount_cents"] },
+  { key: "access_change", label: "Grant or change system access", external: true, category: "access", needs: ["destination", "action_content"] },
+] as const;
+export type ActionType = (typeof ACTION_TYPES)[number]["key"];
+export const ACTION_TYPE_KEYS = ACTION_TYPES.map((a) => a.key) as unknown as readonly ActionType[];
+
+/** Task fields whose change invalidates an approval. */
+export const MATERIAL_TASK_FIELDS = [
+  "title", "description", "agent_id", "kind", "action_type", "destination", "action_content", "amount_cents", "currency", "content_lane", "audience", "evidence_ref",
+] as const;
+
+// ---------------------------------------------------------------- Echo content lanes
+export const CONTENT_LANES = [
+  { key: "operator_lessons", label: "Operator lessons", detail: "What running kitchens, property maintenance and Lawns by Timmy taught you." },
+  { key: "revenue_leaks", label: "Revenue leaks", detail: "Where small businesses quietly lose money: missed calls, slow follow-up, lost estimates." },
+  { key: "systems_explained", label: "Systems explained simply", detail: "One useful system, explained in plain words." },
+  { key: "build_progress", label: "Build progress", detail: "Honest updates on building Fork Algorithm, including what is not done." },
+  { key: "verified_proof", label: "Verified proof", detail: "Only real, verified results. Must link to a completed, non-demo record." },
+] as const;
+export type ContentLane = (typeof CONTENT_LANES)[number]["key"];
+export const CONTENT_LANE_KEYS = CONTENT_LANES.map((l) => l.key) as unknown as readonly ContentLane[];
+
+// Food-world examples are for the culinary audience; trade-service examples are
+// for Fork Algorithm business content. One audience per post, never mixed.
+export const AUDIENCES = [
+  { key: "culinary", label: "Culinary audience (food-world examples only)" },
+  { key: "trade_business", label: "Trade-service business owners (Fork Algorithm)" },
+] as const;
+export type Audience = (typeof AUDIENCES)[number]["key"];
+export const AUDIENCE_KEYS = AUDIENCES.map((a) => a.key) as unknown as readonly Audience[];
+
+export const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
 
 export const OUTREACH_STATUSES = [
   "researched",

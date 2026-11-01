@@ -90,10 +90,10 @@ export async function login(req: Request, env: Env, body: Record<string, unknown
     if (safeEqual(password, env.OWNER_PASSWORD)) {
       const now = nowIso();
       await env.DB.prepare(
-        `INSERT INTO users (id, email, name, role, created_at) VALUES (?, ?, 'Founder', 'owner', ?)
-         ON CONFLICT (email) DO UPDATE SET role = 'owner', disabled = 0`,
+        `INSERT INTO users (id, email, name, role, created_at) VALUES (?, ?, ?, 'owner', ?)
+         ON CONFLICT (email) DO UPDATE SET role = 'owner', disabled = 0, name = excluded.name`,
       )
-        .bind(`usr-${crypto.randomUUID()}`, email, now)
+        .bind(`usr-${crypto.randomUUID()}`, email, env.OWNER_NAME?.trim() || "Founder", now)
         .run();
       user = await env.DB.prepare("SELECT id, email, name, role, password_hash, disabled FROM users WHERE email = ?").bind(email).first();
     }

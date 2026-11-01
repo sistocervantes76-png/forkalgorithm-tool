@@ -47,7 +47,7 @@ async function handleApi(req: Request, env: Env, url: URL): Promise<Response> {
   if (path === "/api/auth/logout" && method === "POST") return logout(req, env, user);
   if (!user) throw new HttpError(401, "Sign in required");
 
-  if (mutating && !(await rateLimit(env, `write:${user.id}`, 120, 60))) throw new HttpError(429, "Too many changes; slow down");
+  if (mutating && !(await rateLimit(env, `write:${user.id}`, Number(env.WRITE_RATE_LIMIT_PER_MINUTE) || 120, 60))) throw new HttpError(429, "Too many changes; slow down");
 
   for (const r of compiled) {
     if (r.method !== method) continue;

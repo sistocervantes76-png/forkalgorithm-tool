@@ -1,61 +1,51 @@
-# Status: what is functional, simulated, disconnected, or unimplemented
+# Status: functional, demonstrated, disconnected, unimplemented
 
-Last updated with the initial build. "Functional" means it is implemented and covered by the end-to-end tests in `tests/api.test.mjs`, or verified in the browser.
+Last updated 2026-11-01 for the first release. "Functional" means implemented and covered by the 24 end-to-end tests in `tests/` (run against a local Worker with a local D1 database), or checked in the browser. **Nothing here has been deployed or tested against live third-party accounts from this build.**
 
-## Functional
+## Functional (first-release scope)
 
-| Area | Notes |
-|---|---|
-| Sign-in, sessions, RBAC | Owner from env secrets; other users stored with PBKDF2 hashes. Roles: owner, admin, operator, viewer. HttpOnly + SameSite=Strict cookie plus a CSRF header check. |
-| Rate limiting | Logins (per IP and per email), writes per user, worker API, webhook. Repeated login failures raise a security alert. |
-| Audit log | Every state change records actor, action, entity, details and IP. |
-| Agent profiles | Nine seeded agents with reporting lines: Atlas reports to the founder; the others report to Atlas. Custom agents and departments can be added. You can rename, change icon/accent/nameplate style, edit responsibilities, prompt, provider/model, autonomy, priority, authority (owner only), schedule, enable/pause, and replace. |
-| Capability gating | Requested + owner-authorized + credentials present. The blocked reason is shown for each capability. |
-| Tasks | IDs, statuses, transitions, logs, timestamps, attempts, idempotency keys, pause/resume/cancel/retry, notes. |
-| Approvals | Created automatically for outreach, financial and access tasks, supervised agents, explicit requests and prospect outreach. Approve, reject or hold, with notes. |
-| Safe failure recovery | Execution leases. Expired leases are retried with backoff or marked failed; final failures raise alerts. |
-| External worker API | Claim, log, complete and fail, plus proposals and recommendations. Off until the owner enables it. |
-| Make.com inbound | Signed webhook that records runs (deduplicated) and raises an alert per failure. |
-| Chief of Staff panel | Department workload, completed and failed work, approvals, opportunities, incidents, recommendations, and the feedback history. |
-| Founder feedback | Like, Dislike, Modify (note required) and Hold. Updates planning preferences only; protected limits are untouched (tested). |
-| Weekly CEO briefing | Aggregated from real records every Friday by cron, or on demand. Demonstration data is excluded. |
-| Market & outreach workspace | Prospects with filters (industry, location, problem, score, status), sources and timestamps, draft messages, an approval request, a pipeline board, and market findings (trends, competitors, published pricing). |
-| Workflows page | Runs per day, failures, and per-workflow success rate and duration from reported runs. |
-| Settings | Integration status with live tests, policies and protected limits, users and roles, demonstration data. |
-| Responsive UI | Desktop sidebar and mobile drawer navigation. Checked for horizontal overflow at 375px on every page. |
+| # | Feature | What works |
+|---|---|---|
+| 1 | Authentication and founder access | Owner account from Worker secrets (`OWNER_EMAIL`, `OWNER_PASSWORD`, optional `OWNER_NAME`). Other users use PBKDF2 hashes. Roles: owner, admin, operator, viewer. HttpOnly SameSite=Strict cookie plus a CSRF header. Login and write rate limits. Every protected action checks the role on the backend. |
+| 2 | Agent profiles and settings | Nine profiles (Atlas reports to the founder; the other eight report to Atlas). Name, nameplate, icon, accent, responsibilities, prompt, provider, model, autonomy, priority, authority, schedule, enable/pause/replace. Persisted in D1 and audited. Prompts are aligned with Fork Algorithm positioning (migration 0003 only rewrites prompts still at their original seed text). |
+| — | Execution readiness | Each agent shows five checks: profile enabled, backend configured, **verified** credentials (live test passed), tools authorized, allowed to execute. Enabling a profile alone shows "Not running". Capabilities need request + owner grant + credentials. |
+| 3 | Tasks | IDs, assignment, statuses, transitions, timestamps, logs, results, idempotency keys. Editing via `PATCH /api/tasks/:id`; running tasks cannot be edited; completed tasks can only change their outbound action. |
+| — | Duplicate prevention | Atomic claim guarded by status **and** `updated_at` (no edit can slip between check and claim), plus a primary key per attempt. Dispatches are one row per task and target; a second send is refused. |
+| — | Attempt history and retries | `task_attempts` keeps every attempt with executor, outcome (`completed`, `failed`, `lease_expired`) and error. Manual retry adds exactly one attempt and is refused if the approval no longer covers the task. Automatic retries use exponential backoff. |
+| 4 | CEO approvals tied to exact actions | Approvals snapshot the action type, destination, exact content and amount, with a SHA-256 fingerprint. A material edit invalidates every live approval for the task and requests a new one. Execution and dispatch re-check the fingerprint. Two stages: **execution** (may this task run) and **release** (may this exact result leave the building). |
+| — | Outbound and financial rules | Real sends (`send_message`, `outbound_campaign`, release-stage outreach) need explicit authorization on the approval. Financial approvals must state an amount and are refused above the protected `limit.max_transaction_usd` (default $0). Approvals never raise limits. |
+| 5 | Founder feedback | Like / Dislike / Modify (note required) / Hold on recommendations **and tasks**, stored permanently. Updates `planning.agent.<id>` preferences only. Tests confirm capabilities, autonomy, authority and protected settings are unchanged. Hold does not pause work. |
+| 6 | Audit history | Every state change: actor, action, entity, details, IP. Includes approval invalidations, release requests, dispatch failures and feedback. |
+| 7 | Weekly CEO review | Default Friday 16:00 America/New_York; day, hour and time zone are settings. Built from real records only (demonstration data excluded). Includes verified executions ("No verified executions yet" when zero), approvals voided by changes, agent readiness, and completed results awaiting feedback. |
+| 8 | Integration states | Not configured (secrets missing), Configured not verified, Connected (verified: live test passed or a verified inbound contact arrived), Disconnected (last test failed). Demonstration records carry a DEMO badge. |
+| — | Echo content lanes | Echo drafts must name one lane (operator lessons, revenue leaks, systems explained simply, build progress, verified proof) and one audience (culinary or trade-service business). Verified proof must reference a completed, non-demo task. Enforced on the backend. |
+| — | Make.com inbound | Signed webhook records runs (deduplicated by execution id) and raises an alert per failure. |
 
-## Built but untested against live services (disconnected until secrets are added)
+## Demonstrated (sample data only)
 
-These adapters are written against each provider's documented API. They have **not** been exercised against real accounts in this build, because no credentials were available. Each one reports *Disconnected* until its secrets are set, and only shows *Connected* after a successful **Test connection**.
+**Settings → Demonstration data** loads flagged sample tasks, approvals, prospects, findings, workflow runs, an alert and a recommendation. Every row has `is_demo = 1`, uses example.com, shows a DEMO badge, is hidden unless "Show demonstration data" is on, cannot be approved, executed, dispatched or used as proof, and is excluded from the weekly review and feedback. Nothing else is simulated.
+
+## Disconnected (code written, never exercised against a live account)
+
+Each shows **Not configured** until its secrets are set, and **Connected** only after a successful live test.
 
 | Integration | What the code does |
 |---|---|
-| Anthropic | Test: `GET /v1/models`. Executor: runs a scheduled task through the official SDK (default `claude-opus-5-5`, with server-side refusal fallback) and stores the output as a labelled **draft**. Uses web search only when the agent's Web research capability is active. Optional narrative for the briefing. |
-| Stripe | Test and Finance page: `GET /v1/balance`, plus charges from the last 30 days (first 100). Read-only. |
-| Make.com outbound | Signed POSTs for alerts in the immediate categories and for "Dispatch to Make.com" on approved, completed tasks. Dispatch is owner-only and happens at most once per task. |
-| RingCentral | Test only: JWT grant token exchange. |
-| Google Sheets | Test: reads the spreadsheet title with a service-account JWT. A `readSheetRange` helper exists but no screen uses it yet. |
-
-## Simulated (demonstration data)
-
-**Settings → Demonstration data** can load sample tasks, approvals, prospects, findings, workflow runs, an alert and a recommendation. Safeguards:
-
-- every row has `is_demo = 1`;
-- domains are `example.com`, and names carry "(demo)" or a "DEMO —" prefix;
-- every row shows a DEMO badge;
-- the rows are hidden unless the viewer switches on "Show demonstration data";
-- they cannot be approved, executed or dispatched;
-- they are excluded from briefings.
-
-Nothing else in the app is simulated.
+| Anthropic | Live test `GET /v1/models`. In-Worker executor writes a labelled **draft** (no tools that act outside; optional web search if authorized). Optional review narrative. |
+| Make.com outbound | Signed POSTs for immediate alerts and for dispatching a release-approved action (owner only, once per task, explicit retry after failure). |
+| Stripe | Read-only balance and last-30-day charges. Cannot move money. |
+| RingCentral | Credential check only (JWT token exchange). |
+| Google Sheets | Credential check (reads the spreadsheet title). A `readSheetRange` helper exists; nothing uses it yet. |
+| External worker API | Claim, log, complete, fail, propose. Off until the owner enables it. Tested locally with a simulated worker. |
 
 ## Not implemented yet
 
-- **Sending outreach.** Approved outreach is not sent automatically. Send it yourself or through an approved Make.com scenario, then mark the prospect *contacted*. Daily outbound caps (`limit.outbound_messages_per_day`) are recorded but not enforced yet, because nothing sends.
-- **Automated research.** Scout does not crawl or search on its own. Findings and prospects are entered manually or by an external worker. The executor can draft research with Claude's web search if authorized, but it does not write prospects into the database.
-- **Multi-step Chief of Staff delegation.** Atlas can propose tasks for other agents through the worker API, and humans advance them. There is no autonomous plan-and-delegate loop running inside the Worker.
-- **RingCentral calling and SMS**, Google Sheets **writes** (the CRM updates capability), and email sending.
-- **AI spend tracking.** `limit.monthly_ai_spend_usd` is recorded only. Enforce it with a spend cap in the Anthropic Console.
-- **Other AI providers.** The provider field is modular (`none`, `anthropic`, `custom-worker`); others can run as external workers.
-- **Email or push delivery of alerts** without Make.com. Alerts appear in-app; immediate notifications need the Make.com outbound webhook.
-- **Password reset and 2FA.** Use Cloudflare Access in front of the app for strong authentication (see DEPLOYMENT.md §5).
+- **Deployment.** Nothing in this release has been deployed. See DEPLOYMENT.md.
+- **Missed-call recovery itself.** RingCentral call logs, missed-call detection and text-back are not built. The Command Center tracks the work; the customer-facing automations live in Make.com.
+- **Sending without Make.com.** No direct email, SMS or social posting. Approved actions go out only through a Make.com scenario.
+- **Lead and estimate tracking, revenue tracking.** No lead or estimate records yet; Finance shows Stripe only. These are later-phase workspaces.
+- **Daily outbound cap enforcement** (`limit.outbound_messages_per_day`) and **AI spend enforcement** (`limit.monthly_ai_spend_usd`): recorded, not enforced, because nothing sends in bulk. Use a spend cap in the Anthropic Console.
+- **Autonomous Atlas delegation loop.** Atlas and workers can propose tasks; humans advance them.
+- **Other AI providers in the Worker.** The provider registry (`worker/adapters/ai.ts`) is ready for more; today other providers run as external workers.
+- **Password reset and 2FA.** Put Cloudflare Access in front (DEPLOYMENT.md §5).
+- **Later-phase workspaces** (Market & Outreach, Workflows, Finance) exist from the first build and use only real records, but are labelled "Later phase" and were not reviewed in this release.

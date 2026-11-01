@@ -6,7 +6,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Env } from "./env";
 import { HttpError, nowIso, parseJsonField } from "./lib";
-import { claimTask, completeTask, failTask, getAgent, getTask, hasCapability, type AgentRow, type TaskRow } from "./tasks";
+import { claimTask, completeTask, effectiveCapabilities, failTask, getAgent, getTask, hasCapability, type AgentRow, type TaskRow } from "./tasks";
+import { integrationStatus } from "./integrations";
 
 const DEFAULT_MODEL = "claude-opus-5-5";
 const FALLBACK_CAPABLE = new Set(["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1"]);
@@ -19,9 +20,70 @@ Operating rules (set by the Command Center, not editable by the agent):
 - When you use web research, cite the source URL for each factual claim.
 - Do not collect personal data beyond published business contact channels.`;
 
+export interface ReadinessCheck {
+  key: "profile" | "backend" | "credentials" | "tools" | "autonomy";
+  label: string;
+  ok: boolean;
+  detail: string;
+}
+
+/**
+ * Whether an agent can actually execute work. Enabling a profile is only one of
+ * five conditions; selecting a capability is not access. Approval of each gated
+ * task is checked separately, at claim time, against the task's exact spec.
+ */
+export async function executionReadiness(env: Env, agent: AgentRow): Promise<{ ready: boolean; summary: string; checks: ReadinessCheck[] }> {
+  const checks: ReadinessCheck[] = [];
+  checks.push({
+    key: "profile",
+    label: "Profile enabled",
+    ok: Boolean(agent.enabled && !agent.paused && !agent.archived),
+    detail: agent.archived ? "Archived" : !agent.enabled ? "Profile disabled" : agent.paused ? "Paused" : "Enabled (this alone does not start anything)",
+  });
+
+  let backendOk = false;
+  let backendDetail = "No backend worker configured (provider: none)";
+  let credOk = false;
+  let credDetail = "No provider credentials";
+  if (agent.provider === "anthropic") {
+    backendOk = true;
+    backendDetail = "In-Worker draft executor";
+    const st = await integrationStatus(env, "anthropic");
+    credOk = st.status === "connected";
+    credDetail = st.status === "connected" ? "Anthropic key verified by a live test" : st.status === "not_configured" ? "ANTHROPIC_API_KEY not configured" : st.status === "unverified" ? "Key set but not verified. Run Test connection in Settings." : `Last connection test failed: ${st.last_test?.message ?? "unknown"}`;
+  } else if (agent.provider === "custom-worker") {
+    const allowed = await env.DB.prepare("SELECT value FROM settings WHERE key = 'access.allow_external_workers'").first<{ value: string }>();
+    const fresh = agent.last_heartbeat_at && Date.now() - new Date(agent.last_heartbeat_at).getTime() < 10 * 60_000;
+    backendOk = allowed?.value === "true" && Boolean(fresh);
+    backendDetail = allowed?.value !== "true" ? "External workers are disabled (owner setting)" : fresh ? "External worker online" : agent.last_heartbeat_at ? "External worker offline" : "No external worker has connected yet";
+    credOk = Boolean(env.WORKER_TOKEN) && Boolean(agent.last_heartbeat_at);
+    credDetail = !env.WORKER_TOKEN ? "WORKER_TOKEN not configured" : agent.last_heartbeat_at ? "Worker authenticated with the worker token" : "Worker token set; no authenticated contact yet";
+  }
+  checks.push({ key: "backend", label: "Backend worker configured", ok: backendOk, detail: backendDetail });
+  checks.push({ key: "credentials", label: "Valid provider credentials", ok: credOk, detail: credDetail });
+
+  const caps = await effectiveCapabilities(env, agent.id);
+  const effective = caps.filter((c) => c.effective).map((c) => c.label);
+  const drafting = caps.find((c) => c.key === "drafting");
+  const toolsOk = agent.provider === "anthropic" ? Boolean(drafting?.effective) : effective.length > 0;
+  checks.push({
+    key: "tools",
+    label: "Tools authorized",
+    ok: toolsOk,
+    detail: effective.length ? `Authorized and backed: ${effective.join(", ")}` : `None active. ${drafting?.blocked_reason ? `Drafting: ${drafting.blocked_reason}` : "Selecting a capability does not grant it."}`,
+  });
+  checks.push({ key: "autonomy", label: "Allowed to execute", ok: agent.autonomy !== "observer", detail: agent.autonomy === "observer" ? "Observer: reports only" : `Autonomy: ${agent.autonomy.replace("_", " ")}` });
+
+  const ready = checks.every((c) => c.ok);
+  const failing = checks.filter((c) => !c.ok).map((c) => c.label.toLowerCase());
+  return { ready, summary: ready ? "Ready to execute approved tasks" : `Not running: missing ${failing.join(", ")}`, checks };
+}
+
 export async function canExecuteInWorker(env: Env, agent: AgentRow): Promise<string | null> {
   if (agent.provider !== "anthropic") return "Agent provider is not set to Anthropic";
   if (!env.ANTHROPIC_API_KEY) return "ANTHROPIC_API_KEY is not configured";
+  const st = await integrationStatus(env, "anthropic");
+  if (st.status !== "connected") return "Anthropic credentials are not verified. Run Test connection in Settings.";
   if (!agent.enabled) return "Agent profile is disabled";
   if (agent.paused) return "Agent is paused";
   if (agent.archived) return "Agent is archived";

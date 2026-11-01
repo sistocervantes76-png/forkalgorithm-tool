@@ -19,10 +19,10 @@ database_name = "fork-command-center"
 database_id = "ccd9217d-dac6-4a69-9dca-28a438460da4"
 migrations_dir = "migrations"
 
-# Chief of Staff housekeeping: every 15 min (stuck-task recovery, due schedules)
-# and Friday 21:00 UTC (weekly CEO briefing). Times are UTC.
+# Every 15 min: stuck-task recovery, due tasks, and the weekly CEO review, which
+# runs on the day/hour/time zone set in Settings (default Friday 16:00 New York).
 [triggers]
-crons = ["*/15 * * * *", "0 21 * * 5"]
+crons = ["*/15 * * * *"]
 
 [vars]
 APP_ENV = "production"

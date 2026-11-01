@@ -36,6 +36,7 @@ function Integrations() {
               Secrets: {i.required_secrets.map((s: string) => <code key={s} className="mr-1 rounded bg-creme-2 px-1">{s}</code>)}
             </p>
           )}
+          {i.verified_contact_at && <p className="mt-2 text-xs text-ok">Last verified contact {fmtDate(i.verified_contact_at)}</p>}
           {i.last_test && (
             <p className={`mt-2 text-xs ${i.last_test.ok ? "text-ok" : "text-bad"}`}>
               Last test {fmtDate(i.last_test.at)}: {i.last_test.message}
@@ -52,14 +53,16 @@ function Integrations() {
   );
 }
 
-const SETTING_META: Record<string, { label: string; kind: "number" | "bool" | "list" | "readonly"; help?: string }> = {
-  "briefing.day": { label: "CEO briefing day", kind: "readonly", help: "Fixed to Friday; change the cron in wrangler.toml to move it." },
-  "briefing.hour_utc": { label: "Briefing hour (UTC)", kind: "readonly", help: "Set by the cron trigger in wrangler.toml." },
+const WEEKDAY_OPTIONS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const SETTING_META: Record<string, { label: string; kind: "number" | "bool" | "list" | "readonly" | "day" | "text"; help?: string }> = {
+  "briefing.day": { label: "Weekly CEO review day", kind: "day", help: "Default Friday. The review is generated once per week from real records." },
+  "briefing.hour_local": { label: "Review hour (local, 0-23)", kind: "number", help: "Hour in the time zone below. Checked every 15 minutes." },
+  "briefing.timezone": { label: "Review time zone", kind: "text", help: "IANA name, e.g. America/New_York." },
   "alerts.immediate_categories": { label: "Immediate alert categories", kind: "list", help: "Comma-separated: security, failure, approval, integration, system. Sent to Make.com when connected." },
   "tasks.running_lease_minutes": { label: "Running-task lease (minutes)", kind: "number", help: "A running task with no result after this long is retried or failed." },
   "limit.monthly_ai_spend_usd": { label: "Monthly AI spend limit (USD)", kind: "number", help: "Recorded limit. Enforce it with a spend cap in the Anthropic Console as well." },
   "limit.outbound_messages_per_day": { label: "Outbound messages per day", kind: "number" },
-  "limit.max_transaction_usd": { label: "Max single transaction (USD)", kind: "number", help: "Agents cannot move money. This limit is recorded for future integrations." },
+  "limit.max_transaction_usd": { label: "Max single transaction (USD)", kind: "number", help: "Financial approvals above this amount are refused. Approvals and feedback never raise it; only this setting does." },
   "legal.outbound_requires_approval": { label: "Outbound requires approval", kind: "readonly", help: "Always on. Cannot be disabled." },
   "access.allow_external_workers": { label: "Allow external workers", kind: "bool", help: "Lets processes holding WORKER_TOKEN claim tasks via /api/worker/*." },
 };
@@ -99,8 +102,10 @@ function SettingRow({ s, editable, reload }: { s: any; editable: boolean; reload
         <div className="flex items-center gap-2">
           {meta.kind === "bool" ? (
             <Select value={v} onChange={(e) => setV(e.target.value)} className="w-28"><option value="false">Off</option><option value="true">On</option></Select>
+          ) : meta.kind === "day" ? (
+            <Select value={v} onChange={(e) => setV(e.target.value)} className="w-36">{WEEKDAY_OPTIONS.map((d) => <option key={d} value={d}>{d[0].toUpperCase() + d.slice(1)}</option>)}</Select>
           ) : (
-            <Input value={v} onChange={(e) => setV(e.target.value)} className={meta.kind === "list" ? "w-64" : "w-28"} type={meta.kind === "number" ? "number" : "text"} />
+            <Input value={v} onChange={(e) => setV(e.target.value)} className={meta.kind === "list" || meta.kind === "text" ? "w-64" : "w-28"} type={meta.kind === "number" ? "number" : "text"} />
           )}
           <Button size="sm" disabled={busy || v === initial} onClick={save}>Save</Button>
         </div>

@@ -1,8 +1,13 @@
 // Authenticated JSON API for the Command Center UI.
 import type { Env } from "./env";
 import {
+  ACTION_TYPE_KEYS,
   APPROVAL_CATEGORIES,
+  AUDIENCE_KEYS,
   AUTONOMY_LEVELS,
+  CONTENT_LANE_KEYS,
+  TASK_KINDS,
+  WEEKDAYS,
   CAPABILITIES,
   FEEDBACK_VERDICTS,
   OUTREACH_STATUSES,
@@ -17,18 +22,26 @@ import { HttpError, audit, json, newId, nowIso, parseJsonField } from "./lib";
 import { bool, int, isoDate, oneOf, reqStr, str, strArray, url } from "./validate";
 import {
   addLog,
+  approvalBlock,
   createApproval,
   createTask,
   decideApproval,
   effectiveCapabilities,
   getAgent,
   getTask,
+  requestExecutionApproval,
+  requestRelease,
   transitionTask,
+  updateTask,
+  validReleaseApproval,
+  assertActionComplete,
+  type ActionSpec,
   type AgentRow,
+  type TaskPatch,
 } from "./tasks";
 import { INTEGRATIONS, integrationStatuses, secretsPresent, sendToMake, stripeFinancialSummary, testIntegration } from "./integrations";
-import { canExecuteInWorker, executeTask } from "./executor";
-import { generateBriefing, weekStart } from "./briefing";
+import { canExecuteInWorker, executeTask, executionReadiness } from "./executor";
+import { generateBriefing, nextReviewDate, reviewSchedule, weekStart } from "./briefing";
 import { clearDemo, loadDemo } from "./demo";
 
 export interface Ctx {
@@ -49,6 +62,28 @@ const actorOf = (c: Ctx) => `user:${c.user.id}`;
 /** Demo rows are hidden unless the viewer opts in with ?demo=1. */
 const demoFilter = (c: Ctx, alias = "") => (c.url.searchParams.get("demo") === "1" ? "" : ` AND ${alias}is_demo = 0`);
 
+/**
+ * Reads the exact-action and content-lane fields shared by task create/edit and
+ * release requests. With `nullable`, an explicit null clears a field.
+ */
+function actionAndContent(b: Record<string, unknown>, nullable = false) {
+  const n = <T>(field: string, read: () => T): T | null | undefined => (nullable && b[field] === null ? null : read());
+  return {
+    action_type: n("action_type", () => oneOf(b, "action_type", ACTION_TYPE_KEYS, true)),
+    destination: n("destination", () => str(b, "destination", { optional: true, max: 500 })),
+    action_content: n("action_content", () => str(b, "action_content", { optional: true, max: 20_000, trim: false })),
+    amount_cents: n("amount_cents", () => int(b, "amount_cents", { optional: true, min: 0, max: 100_000_000 })),
+    currency: n("currency", () => {
+      const v = str(b, "currency", { optional: true, max: 3 });
+      if (v && !/^[a-zA-Z]{3}$/.test(v)) throw new HttpError(400, "Invalid currency: use a 3-letter code");
+      return v?.toLowerCase();
+    }),
+    content_lane: n("content_lane", () => oneOf(b, "content_lane", CONTENT_LANE_KEYS, true)),
+    audience: n("audience", () => oneOf(b, "audience", AUDIENCE_KEYS, true)),
+    evidence_ref: n("evidence_ref", () => str(b, "evidence_ref", { optional: true, max: 40 })),
+  };
+}
+
 // ---------------------------------------------------------------- agent helpers
 
 function connectionState(env: Env, a: AgentRow): { state: string; label: string } {
@@ -57,15 +92,15 @@ function connectionState(env: Env, a: AgentRow): { state: string; label: string 
   if (a.paused) return { state: "paused", label: "Paused" };
   if (a.provider === "anthropic") {
     return env.ANTHROPIC_API_KEY
-      ? { state: "ready", label: "Ready — in-Worker draft executor" }
-      : { state: "disconnected", label: "Disconnected — ANTHROPIC_API_KEY missing" };
+      ? { state: "configured", label: "Profile enabled · Anthropic key set (readiness checks below)" }
+      : { state: "not_configured", label: "Not configured · ANTHROPIC_API_KEY missing" };
   }
   if (a.provider === "custom-worker") {
     if (!a.last_heartbeat_at) return { state: "awaiting_worker", label: "No worker has connected yet" };
     const age = Date.now() - new Date(a.last_heartbeat_at).getTime();
     return age < 10 * 60_000 ? { state: "online", label: "Worker online" } : { state: "offline", label: "Worker offline" };
   }
-  return { state: "not_configured", label: "No execution backend configured" };
+  return { state: "not_configured", label: "Profile enabled · no execution backend, so nothing runs" };
 }
 
 async function agentStats(c: Ctx) {
@@ -93,7 +128,7 @@ async function agentStats(c: Ctx) {
   return { stats, assignment, errors };
 }
 
-function presentAgent(env: Env, a: AgentRow, s: Awaited<ReturnType<typeof agentStats>>) {
+function presentAgent(env: Env, a: AgentRow, s: Awaited<ReturnType<typeof agentStats>>, readiness?: Awaited<ReturnType<typeof executionReadiness>>) {
   const st = s.stats.get(a.id);
   const done = (st?.completed ?? 0) + (st?.failed ?? 0);
   return {
@@ -105,6 +140,8 @@ function presentAgent(env: Env, a: AgentRow, s: Awaited<ReturnType<typeof agentS
     responsibilities: parseJsonField<string[]>(a.responsibilities, []),
     schedule: parseJsonField<Record<string, unknown>>(a.schedule, {}),
     connection: connectionState(env, a),
+    readiness: readiness ?? null,
+    verified_execution: a.last_confirmed_execution_at ? { last_at: a.last_confirmed_execution_at } : { last_at: null, label: "No verified executions yet" },
     current_assignment: s.assignment.get(a.id) ?? null,
     stats: {
       completed: st?.completed ?? 0,
@@ -153,17 +190,11 @@ route("GET", "/api/overview", async (c) => {
       with_backend: agents.results.filter((a) => a.provider !== "none").length,
     },
     integrations: integrations.map((i) => ({ key: i.key, name: i.name, status: i.status })),
-    next_briefing: nextBriefingDate(),
+    next_briefing: nextReviewDate(await reviewSchedule(c.env)),
+    review_schedule: await reviewSchedule(c.env),
+    verified_executions: (await db.prepare("SELECT COUNT(*) AS n FROM task_attempts a JOIN tasks t ON t.id = a.task_id WHERE a.outcome = 'completed' AND t.is_demo = 0").first<{ n: number }>())?.n ?? 0,
   });
 });
-
-function nextBriefingDate(): string {
-  const d = new Date();
-  const add = (5 - d.getUTCDay() + 7) % 7;
-  const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + add, 21));
-  if (next.getTime() <= Date.now()) next.setUTCDate(next.getUTCDate() + 7);
-  return next.toISOString();
-}
 
 route("GET", "/api/activity", async (c) => {
   const limit = Math.min(Number(c.url.searchParams.get("limit") ?? 40), 200);
@@ -204,7 +235,8 @@ route("GET", "/api/agents", async (c) => {
   const includeArchived = c.url.searchParams.get("archived") === "1";
   const rows = await c.env.DB.prepare(`SELECT * FROM agents ${includeArchived ? "" : "WHERE archived = 0"} ORDER BY is_core DESC, created_at, name`).all<AgentRow>();
   const s = await agentStats(c);
-  return json({ agents: rows.results.map((a) => presentAgent(c.env, a, s)) });
+  const readiness = await Promise.all(rows.results.map((a) => executionReadiness(c.env, a)));
+  return json({ agents: rows.results.map((a, i) => presentAgent(c.env, a, s, readiness[i])) });
 });
 
 route("GET", "/api/agents/:id", async (c) => {
@@ -225,7 +257,7 @@ route("GET", "/api/agents/:id", async (c) => {
   ]);
   const blocked = await canExecuteInWorker(c.env, a);
   return json({
-    agent: presentAgent(c.env, a, s),
+    agent: presentAgent(c.env, a, s, await executionReadiness(c.env, a)),
     capabilities: caps,
     tasks: tasks.results,
     logs: logs.results,
@@ -389,8 +421,9 @@ route("POST", "/api/tasks", async (c) => {
     description: str(c.body, "description", { optional: true, max: 8000 }),
     agent_id: str(c.body, "agent_id", { optional: true, max: 80 }) ?? null,
     priority: oneOf(c.body, "priority", PRIORITIES, true),
-    kind: oneOf(c.body, "kind", ["general", "draft", "research", "outreach", "report", "financial", "access"], true),
+    kind: oneOf(c.body, "kind", TASK_KINDS, true),
     requires_approval: bool(c.body, "requires_approval"),
+    ...actionAndContent(c.body),
     idempotency_key: str(c.body, "idempotency_key", { optional: true, max: 120 }),
     scheduled_for: isoDate(c.body, "scheduled_for"),
     max_attempts: int(c.body, "max_attempts", { optional: true, min: 1, max: 10 }),
@@ -403,13 +436,52 @@ route("POST", "/api/tasks", async (c) => {
 
 route("GET", "/api/tasks/:id", async (c) => {
   const task = await getTask(c.env, c.params.id);
-  const [logs, approval, agent] = await Promise.all([
+  const [logs, approval, approvals, attempts, dispatch, feedback, agent] = await Promise.all([
     c.env.DB.prepare("SELECT * FROM task_logs WHERE task_id = ? ORDER BY ts, id").bind(task.id).all(),
     task.approval_id ? c.env.DB.prepare("SELECT * FROM approvals WHERE id = ?").bind(task.approval_id).first() : null,
+    c.env.DB.prepare("SELECT * FROM approvals WHERE task_id = ? ORDER BY created_at DESC").bind(task.id).all(),
+    c.env.DB.prepare("SELECT * FROM task_attempts WHERE task_id = ? ORDER BY attempt").bind(task.id).all(),
+    c.env.DB.prepare("SELECT * FROM task_dispatches WHERE task_id = ?").bind(task.id).all(),
+    c.env.DB.prepare("SELECT f.*, u.name AS user_name FROM feedback f LEFT JOIN users u ON u.id = f.user_id WHERE f.target_type = 'task' AND f.target_id = ? ORDER BY f.created_at DESC").bind(task.id).all(),
     task.agent_id ? getAgent(c.env, task.agent_id) : null,
   ]);
-  const blocked = agent ? await canExecuteInWorker(c.env, agent) : "No agent assigned";
-  return json({ task, logs: logs.results, approval, agent_name: agent?.name ?? null, can_run_in_worker: !blocked, run_blocked_reason: blocked });
+  const blocked = agent ? (await canExecuteInWorker(c.env, agent)) ?? (await approvalBlock(c.env, task)) : "No agent assigned";
+  const release = task.status === "completed" ? await validReleaseApproval(c.env, task) : null;
+  return json({
+    task,
+    logs: logs.results,
+    approval,
+    approvals: approvals.results,
+    attempts: attempts.results,
+    dispatches: dispatch.results,
+    feedback: feedback.results,
+    agent_name: agent?.name ?? null,
+    can_run_in_worker: !blocked,
+    run_blocked_reason: blocked,
+    release: release ? ("approval" in release ? { ready: true, approval_id: release.approval.id } : { ready: false, reason: release.reason }) : null,
+  });
+});
+
+route("PATCH", "/api/tasks/:id", async (c) => {
+  requireRole(c.user, "operator");
+  const b = c.body;
+  const patch: TaskPatch = {
+    title: str(b, "title", { optional: true, max: 200 }),
+    description: b.description === "" ? "" : str(b, "description", { optional: true, max: 8000 }),
+    priority: oneOf(b, "priority", PRIORITIES, true),
+    scheduled_for: b.scheduled_for === null ? null : isoDate(b, "scheduled_for"),
+    agent_id: b.agent_id === null ? null : str(b, "agent_id", { optional: true, max: 80 }),
+    ...actionAndContent(b, true),
+  };
+  for (const k of Object.keys(patch) as (keyof TaskPatch)[]) if (patch[k] === undefined) delete patch[k];
+  const { task, invalidated } = await updateTask(c.env, c.params.id, patch, actorOf(c));
+  return json({ task, invalidated });
+});
+
+route("POST", "/api/tasks/:id/release", async (c) => {
+  requireRole(c.user, "operator");
+  const r = await requestRelease(c.env, c.params.id, actionAndContent(c.body, true) as ActionSpec, actorOf(c));
+  return json(r, 201);
 });
 
 route("POST", "/api/tasks/:id/transition", async (c) => {
@@ -420,17 +492,13 @@ route("POST", "/api/tasks/:id/transition", async (c) => {
   if (task.status === "proposed" && to === "scheduled" && task.agent_id) {
     const agent = await getAgent(c.env, task.agent_id);
     if (agent.autonomy === "observer") throw new HttpError(409, `${agent.name} is an observer and cannot execute tasks`);
-    if (task.requires_approval || agent.autonomy === "supervised" || ["outreach", "financial", "access"].includes(task.kind)) {
+    if (task.requires_approval || agent.autonomy === "supervised" || ["outreach", "financial", "access", "publication"].includes(task.kind)) {
       throw new HttpError(409, "This task needs founder approval. Submit it for approval instead.");
     }
   }
   if (to === "awaiting_approval") {
     if (task.status !== "proposed") throw new HttpError(409, "Only proposals can be submitted for approval");
-    const id = await createApproval(c.env, {
-      task_id: task.id, title: `Approve task: ${task.title}`, description: task.description, category: task.kind === "outreach" ? "outbound_campaign" : task.kind === "financial" ? "financial" : task.kind === "access" ? "access" : "general",
-      risk_level: "medium", requested_by: actorOf(c),
-    });
-    await c.env.DB.prepare("UPDATE tasks SET approval_id = ?, requires_approval = 1 WHERE id = ?").bind(id, task.id).run();
+    await requestExecutionApproval(c.env, task, "Submitted for founder approval", actorOf(c));
   }
   const updated = await transitionTask(c.env, task.id, to, actorOf(c), str(c.body, "note", { optional: true, max: 500 }));
   return json({ task: updated });
@@ -441,12 +509,16 @@ route("POST", "/api/tasks/:id/retry", async (c) => {
   const task = await getTask(c.env, c.params.id);
   if (task.is_demo) throw new HttpError(409, "Demonstration tasks are read-only");
   if (task.status !== "failed") throw new HttpError(409, "Only failed tasks can be retried");
-  if (task.attempts >= task.max_attempts) {
-    await c.env.DB.prepare("UPDATE tasks SET max_attempts = attempts + 1 WHERE id = ?").bind(task.id).run();
-    await addLog(c.env, task.id, "info", "Attempt limit raised by one for a manual retry", actorOf(c));
-  }
-  await c.env.DB.prepare("UPDATE tasks SET scheduled_for = NULL, error = NULL WHERE id = ?").bind(task.id).run();
-  return json({ task: await transitionTask(c.env, task.id, "scheduled", actorOf(c), str(c.body, "note", { optional: true, max: 500 })) });
+  const blocked = await approvalBlock(c.env, task);
+  if (blocked) throw new HttpError(409, blocked);
+  // Controlled retry: one extra attempt at a time, with the previous error kept in the attempt history.
+  const updated = await c.env.DB.prepare(
+    "UPDATE tasks SET max_attempts = MAX(max_attempts, attempts + 1), scheduled_for = NULL, updated_at = ? WHERE id = ? AND status = 'failed' AND updated_at = ?",
+  )
+    .bind(nowIso(), task.id, task.updated_at)
+    .run();
+  if (!updated.meta.changes) throw new HttpError(409, "Task changed concurrently; refresh and try again");
+  return json({ task: await transitionTask(c.env, task.id, "scheduled", actorOf(c), str(c.body, "note", { optional: true, max: 500 }) ?? `manual retry after: ${task.error ?? "unknown error"}`) });
 });
 
 route("POST", "/api/tasks/:id/run", async (c) => {
@@ -462,20 +534,53 @@ route("POST", "/api/tasks/:id/notes", async (c) => {
 });
 
 route("POST", "/api/tasks/:id/dispatch", async (c) => {
-  // Sends a completed, approved task's result to Make.com for real-world action.
+  // Sends a completed task's exact, release-approved action to Make.com. Owner only.
   requireRole(c.user, "owner");
   const task = await getTask(c.env, c.params.id);
   if (task.is_demo) throw new HttpError(409, "Demonstration tasks cannot be dispatched");
   if (task.status !== "completed") throw new HttpError(409, "Only completed tasks can be dispatched");
-  if (!task.approval_id) throw new HttpError(409, "Dispatch requires an approved approval record on the task");
-  const appr = await c.env.DB.prepare("SELECT status FROM approvals WHERE id = ?").bind(task.approval_id).first<{ status: string }>();
-  if (appr?.status !== "approved") throw new HttpError(409, "The task's approval is not in the approved state");
-  if (!secretsPresent(c.env, "make_outbound")) throw new HttpError(409, "Make.com outbound is disconnected");
-  const already = await c.env.DB.prepare("SELECT id FROM task_logs WHERE task_id = ? AND message LIKE 'Dispatched to Make.com%'").bind(task.id).first();
-  if (already) throw new HttpError(409, "Task was already dispatched (duplicate prevention)");
-  await sendToMake(c.env, { type: "task.dispatch", idempotency_key: `dispatch:${task.id}`, task_id: task.id, kind: task.kind, title: task.title, result: task.result, approval_id: task.approval_id });
-  await addLog(c.env, task.id, "info", "Dispatched to Make.com", actorOf(c));
-  await audit(c.env, actorOf(c), "task.dispatch", "task", task.id, {}, c.ip);
+  const release = await validReleaseApproval(c.env, task);
+  if ("reason" in release) throw new HttpError(409, release.reason);
+  if (!secretsPresent(c.env, "make_outbound")) throw new HttpError(409, "Make.com outbound is not configured");
+  const retry = bool(c.body, "retry") ?? false;
+  const now = nowIso();
+  const actor = actorOf(c);
+
+  // Claim the dispatch slot first. The primary key (task_id, target) makes a second send impossible;
+  // only a failed dispatch can be retried, and only explicitly.
+  const claim = retry
+    ? await c.env.DB.prepare(
+        "UPDATE task_dispatches SET status = 'sending', attempts = attempts + 1, approval_id = ?, fingerprint = ?, actor = ?, updated_at = ? WHERE task_id = ? AND target = 'make' AND status = 'failed'",
+      ).bind(release.approval.id, release.approval.fingerprint, actor, now, task.id).run()
+    : await c.env.DB.prepare(
+        "INSERT INTO task_dispatches (task_id, target, approval_id, fingerprint, status, actor, created_at, updated_at) VALUES (?, 'make', ?, ?, 'sending', ?, ?, ?) ON CONFLICT (task_id, target) DO NOTHING",
+      ).bind(task.id, release.approval.id, release.approval.fingerprint, actor, now, now).run();
+  if (!claim.meta.changes) {
+    const existing = await c.env.DB.prepare("SELECT status FROM task_dispatches WHERE task_id = ? AND target = 'make'").bind(task.id).first<{ status: string }>();
+    throw new HttpError(409, existing?.status === "failed" ? "The last dispatch failed. Retry it explicitly." : `Already dispatched (${existing?.status ?? "unknown"}); duplicate prevented`);
+  }
+  try {
+    await sendToMake(c.env, {
+      type: "task.dispatch",
+      idempotency_key: `dispatch:${task.id}:${release.approval.fingerprint}`,
+      task_id: task.id,
+      approval_id: release.approval.id,
+      action_type: task.action_type,
+      destination: task.destination,
+      content: task.action_content,
+      amount_cents: task.amount_cents,
+      currency: task.currency,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Dispatch failed";
+    await c.env.DB.prepare("UPDATE task_dispatches SET status = 'failed', last_error = ?, updated_at = ? WHERE task_id = ? AND target = 'make'").bind(message, nowIso(), task.id).run();
+    await addLog(c.env, task.id, "error", `Dispatch to Make.com failed: ${message}`, actor);
+    await audit(c.env, actor, "task.dispatch_failed", "task", task.id, { error: message }, c.ip);
+    throw new HttpError(502, `Dispatch failed: ${message}. Nothing was marked as sent; you can retry.`);
+  }
+  await c.env.DB.prepare("UPDATE task_dispatches SET status = 'sent', last_error = NULL, updated_at = ? WHERE task_id = ? AND target = 'make'").bind(nowIso(), task.id).run();
+  await addLog(c.env, task.id, "info", `Dispatched to Make.com under approval ${release.approval.id}`, actor);
+  await audit(c.env, actor, "task.dispatch", "task", task.id, { approval_id: release.approval.id, fingerprint: release.approval.fingerprint }, c.ip);
   return json({ ok: true });
 });
 
@@ -484,6 +589,7 @@ route("POST", "/api/tasks/:id/dispatch", async (c) => {
 route("GET", "/api/approvals", async (c) => {
   const status = c.url.searchParams.get("status");
   const where = status === "open" ? "ap.status IN ('pending','held')" : status ? "ap.status = ?" : "1=1";
+  if (status && status !== "open" && !["approved", "rejected", "invalidated", "pending", "held"].includes(status)) throw new HttpError(400, "Unknown status filter");
   const stmt = c.env.DB.prepare(
     `SELECT ap.*, t.title AS task_title, t.agent_id, a.name AS agent_name FROM approvals ap
      LEFT JOIN tasks t ON t.id = ap.task_id LEFT JOIN agents a ON a.id = t.agent_id
@@ -495,12 +601,15 @@ route("GET", "/api/approvals", async (c) => {
 
 route("POST", "/api/approvals", async (c) => {
   requireRole(c.user, "operator");
+  const action = actionAndContent(c.body, true) as ActionSpec;
+  assertActionComplete(action, "Approval");
   const id = await createApproval(c.env, {
     title: reqStr(c.body, "title", { max: 200 }),
     description: str(c.body, "description", { optional: true, max: 4000 }) ?? "",
     category: oneOf(c.body, "category", APPROVAL_CATEGORIES)!,
     risk_level: oneOf(c.body, "risk_level", ["low", "medium", "high", "critical"], true) ?? "medium",
     requested_by: actorOf(c),
+    ...action,
   });
   await audit(c.env, actorOf(c), "approval.request", "approval", id, {}, c.ip);
   return json({ id }, 201);
@@ -509,7 +618,9 @@ route("POST", "/api/approvals", async (c) => {
 route("POST", "/api/approvals/:id/decision", async (c) => {
   requireRole(c.user, "owner");
   const decision = oneOf(c.body, "decision", ["approved", "rejected", "held"])!;
-  await decideApproval(c.env, c.params.id, decision, c.user.id, str(c.body, "note", { optional: true, max: 1000 }));
+  await decideApproval(c.env, c.params.id, decision, c.user.id, str(c.body, "note", { optional: true, max: 1000 }), {
+    explicit_outbound: bool(c.body, "explicit_outbound") ?? false,
+  });
   return json({ ok: true });
 });
 
@@ -534,8 +645,10 @@ route("GET", "/api/chief-of-staff", async (c) => {
     db.prepare(`SELECT * FROM alerts WHERE category IN ('failure','security','integration','system') AND acknowledged_at IS NULL${df} ORDER BY created_at DESC LIMIT 20`).all(),
     db.prepare(`SELECT * FROM recommendations WHERE 1=1${df} ORDER BY created_at DESC LIMIT 30`).all(),
     db.prepare(
-      `SELECT f.*, r.title AS recommendation_title, u.name AS user_name FROM feedback f
-       LEFT JOIN recommendations r ON r.id = f.recommendation_id LEFT JOIN users u ON u.id = f.user_id
+      `SELECT f.*, COALESCE(r.title, t.title) AS recommendation_title, u.name AS user_name FROM feedback f
+       LEFT JOIN recommendations r ON f.target_type = 'recommendation' AND r.id = f.target_id
+       LEFT JOIN tasks t ON f.target_type = 'task' AND t.id = f.target_id
+       LEFT JOIN users u ON u.id = f.user_id
        ORDER BY f.created_at DESC LIMIT 50`,
     ).all(),
   ]);
@@ -565,38 +678,73 @@ route("POST", "/api/recommendations", async (c) => {
 
 const VERDICT_STATUS = { like: "liked", dislike: "disliked", modify: "modify_requested", hold: "held" } as const;
 
-route("POST", "/api/recommendations/:id/feedback", async (c) => {
+/**
+ * Records Like / Dislike / Modify / Hold on a recommendation or a task. Feedback
+ * updates planning preferences only (planning.agent.<id>). It never changes task
+ * status, capabilities, autonomy, authority or protected settings.
+ */
+async function recordFeedback(c: Ctx, targetType: "recommendation" | "task", targetId: string) {
   requireRole(c.user, "owner");
-  const rec = await c.env.DB.prepare("SELECT * FROM recommendations WHERE id = ?").bind(c.params.id).first<{ id: string; agent_id: string | null; title: string }>();
-  if (!rec) throw new HttpError(404, "Recommendation not found");
+  let agentId: string | null;
+  let title: string;
+  let lane: string | null = null;
+  if (targetType === "recommendation") {
+    const rec = await c.env.DB.prepare("SELECT id, agent_id, title FROM recommendations WHERE id = ?").bind(targetId).first<{ id: string; agent_id: string | null; title: string }>();
+    if (!rec) throw new HttpError(404, "Recommendation not found");
+    agentId = rec.agent_id;
+    title = rec.title;
+  } else {
+    const t = await getTask(c.env, targetId);
+    if (t.is_demo) throw new HttpError(409, "Feedback on demonstration data is not recorded");
+    agentId = t.agent_id;
+    title = t.title;
+    lane = t.content_lane;
+  }
   const verdict = oneOf(c.body, "verdict", FEEDBACK_VERDICTS)!;
   const note = str(c.body, "note", { optional: true, max: 2000 }) ?? "";
   if (verdict === "modify" && !note) throw new HttpError(400, "Describe the modification you want");
   const fid = newId("FBK");
   const now = nowIso();
-  await c.env.DB.batch([
-    c.env.DB.prepare("INSERT INTO feedback (id, recommendation_id, verdict, note, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?)").bind(fid, rec.id, verdict, note, c.user.id, now),
-    c.env.DB.prepare("UPDATE recommendations SET status = ? WHERE id = ?").bind(VERDICT_STATUS[verdict], rec.id),
-  ]);
-  // Update planning preferences only. Financial limits, legal permissions and
-  // system access live in protected settings and are never touched here.
-  const prefKey = `planning.agent.${rec.agent_id ?? "agt-atlas"}`;
+  const stmts = [
+    c.env.DB.prepare("INSERT INTO feedback (id, recommendation_id, target_type, target_id, verdict, note, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(fid, targetType === "recommendation" ? targetId : null, targetType, targetId, verdict, note, c.user.id, now),
+  ];
+  if (targetType === "recommendation") stmts.push(c.env.DB.prepare("UPDATE recommendations SET status = ? WHERE id = ?").bind(VERDICT_STATUS[verdict], targetId));
+  await c.env.DB.batch(stmts);
+
+  const prefKey = `planning.agent.${agentId ?? "agt-atlas"}`;
   assertNotProtected(prefKey);
   const existing = await c.env.DB.prepare("SELECT value FROM founder_preferences WHERE key = ?").bind(prefKey).first<{ value: string }>();
-  const pref = parseJsonField<{ like: number; dislike: number; modify: number; hold: number; recent: { verdict: string; title: string; note: string }[] }>(
+  const pref = parseJsonField<{ like: number; dislike: number; modify: number; hold: number; recent: { verdict: string; title: string; note: string; lane?: string | null; on: string }[] }>(
     existing?.value,
     { like: 0, dislike: 0, modify: 0, hold: 0, recent: [] },
   );
   pref[verdict] += 1;
-  pref.recent = [{ verdict, title: rec.title, note }, ...pref.recent].slice(0, 10);
+  pref.recent = [{ verdict, title, note, lane, on: targetType }, ...pref.recent].slice(0, 10);
   await c.env.DB.prepare(
     `INSERT INTO founder_preferences (key, value, source_feedback_id, updated_by, updated_at) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT (key) DO UPDATE SET value = excluded.value, source_feedback_id = excluded.source_feedback_id, updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
   )
     .bind(prefKey, JSON.stringify(pref), fid, c.user.id, now)
     .run();
-  await audit(c.env, actorOf(c), "recommendation.feedback", "recommendation", rec.id, { verdict, preference_key: prefKey }, c.ip);
-  return json({ ok: true, preference_key: prefKey });
+  if (targetType === "task") await addLog(c.env, targetId, "info", `Founder feedback: ${verdict}${note ? ` — ${note}` : ""} (planning preference only)`, actorOf(c));
+  await audit(c.env, actorOf(c), `${targetType}.feedback`, targetType, targetId, { verdict, preference_key: prefKey, feedback_id: fid }, c.ip);
+  return json({ ok: true, id: fid, preference_key: prefKey });
+}
+
+route("POST", "/api/recommendations/:id/feedback", (c) => recordFeedback(c, "recommendation", c.params.id));
+route("POST", "/api/tasks/:id/feedback", (c) => recordFeedback(c, "task", c.params.id));
+
+route("GET", "/api/feedback", async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT f.*, u.name AS user_name,
+       COALESCE(r.title, t.title) AS target_title
+     FROM feedback f LEFT JOIN users u ON u.id = f.user_id
+     LEFT JOIN recommendations r ON f.target_type = 'recommendation' AND r.id = f.target_id
+     LEFT JOIN tasks t ON f.target_type = 'task' AND t.id = f.target_id
+     ORDER BY f.created_at DESC LIMIT 200`,
+  ).all();
+  return json({ feedback: rows.results });
 });
 
 function assertNotProtected(key: string) {
@@ -718,7 +866,17 @@ route("PATCH", "/api/intel/prospects/:id", async (c) => {
   add("deal_value_cents", int(c.body, "deal_value_cents", { optional: true, min: 0 }));
   if (!sets.length) throw new HttpError(400, "No changes supplied");
   // A changed message invalidates a prior approval.
-  if (c.body.proposed_message !== undefined && row.outreach_status === "approved") (sets.push("outreach_status = 'drafted'"), sets.push("approval_id = NULL"));
+  // Editing the message voids any approval for the old text.
+  if (c.body.proposed_message !== undefined && ["approved", "awaiting_approval"].includes(row.outreach_status)) {
+    sets.push("outreach_status = 'drafted'", "approval_id = NULL");
+    const apr = (row as { approval_id?: string | null }).approval_id;
+    if (apr) {
+      await c.env.DB.prepare("UPDATE approvals SET status = 'invalidated', invalidated_at = ?, invalidated_reason = 'Outreach message edited after the approval was requested' WHERE id = ? AND status IN ('pending','held','approved')")
+        .bind(nowIso(), apr)
+        .run();
+      await audit(c.env, actorOf(c), "approval.invalidated", "approval", apr, { prospect_id: row.id, reason: "message edited" }, c.ip);
+    }
+  }
   sets.push("updated_at = ?");
   vals.push(nowIso());
   await c.env.DB.prepare(`UPDATE prospects SET ${sets.join(", ")} WHERE id = ?`).bind(...vals, row.id).run();
@@ -735,11 +893,15 @@ route("POST", "/api/intel/prospects/:id/request-outreach", async (c) => {
   if (!p.public_contact) throw new HttpError(409, "No published business contact channel on record");
   if (["awaiting_approval", "approved"].includes(p.outreach_status)) throw new HttpError(409, `Outreach is already ${p.outreach_status}`);
   const id = await createApproval(c.env, {
+    stage: "release",
     title: `Outreach to ${p.business_name}`,
-    description: `Channel: ${p.public_contact}\nSource: ${p.source_url ?? "n/a"}\n\nMessage:\n${p.proposed_message}`,
+    description: `Source: ${p.source_url ?? "n/a"}`,
     category: "outbound_campaign",
     risk_level: "medium",
     requested_by: actorOf(c),
+    action_type: "send_message",
+    destination: p.public_contact,
+    action_content: p.proposed_message,
     is_demo: Boolean(p.is_demo),
   });
   await c.env.DB.prepare("UPDATE prospects SET outreach_status = 'awaiting_approval', approval_id = ?, updated_at = ? WHERE id = ?").bind(id, nowIso(), p.id).run();
@@ -816,7 +978,17 @@ route("POST", "/api/integrations/:key/test", async (c) => {
 });
 
 const EDITABLE_SETTINGS: Record<string, (v: unknown) => string> = {
-  "briefing.day": (v) => JSON.stringify(oneOf({ v }, "v", ["friday"])), // cron controls the actual schedule
+  "briefing.day": (v) => JSON.stringify(oneOf({ v }, "v", WEEKDAYS)),
+  "briefing.hour_local": (v) => String(int({ v }, "v", { min: 0, max: 23 })),
+  "briefing.timezone": (v) => {
+    const tz = reqStr({ v }, "v", { max: 60 });
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    } catch {
+      throw new HttpError(400, "Unknown time zone");
+    }
+    return JSON.stringify(tz);
+  },
   "alerts.immediate_categories": (v) => JSON.stringify(strArray({ v }, "v", { maxItems: 10 })),
   "tasks.running_lease_minutes": (v) => String(int({ v }, "v", { min: 5, max: 240 })),
   "limit.monthly_ai_spend_usd": (v) => String(int({ v }, "v", { min: 0, max: 1_000_000 })),

@@ -67,8 +67,11 @@ test("agent settings persist; enabling a profile does not fake a connection", as
   const { body } = await owner("GET", "/api/agents/agt-echo");
   assert.equal(body.agent.autonomy, "supervised");
   assert.equal(body.agent.priority, "high");
-  assert.equal(body.agent.connection.state, "disconnected"); // no ANTHROPIC_API_KEY locally
+  assert.equal(body.agent.connection.state, "not_configured"); // no ANTHROPIC_API_KEY locally
   assert.equal(body.executor.in_worker_available, false);
+  assert.equal(body.agent.readiness.ready, false); // enabling a profile does not start an agent
+  assert.equal(body.agent.readiness.checks.find((c) => c.key === "credentials").ok, false);
+  assert.equal(body.agent.verified_execution.label, "No verified executions yet");
   await owner("PATCH", "/api/agents/agt-echo", { autonomy: "draft_only", priority: "normal", enabled: false, provider: "none", model: "" });
 });
 
@@ -111,7 +114,8 @@ test("approval decisions drive task state and are audited", async () => {
   const t2 = (await owner("POST", "/api/tasks", { title: "Outreach B", agent_id: "agt-hunter", kind: "outreach" })).body.task;
   assert.equal((await owner("POST", `/api/approvals/${t1.approval_id}/decision`, { decision: "held", note: "next week" })).status, 200);
   assert.equal((await owner("GET", `/api/tasks/${t1.id}`)).body.task.status, "awaiting_approval");
-  await owner("POST", `/api/approvals/${t1.approval_id}/decision`, { decision: "approved" });
+  // Approving an outreach task authorizes drafting only; the send needs its own release approval.
+  assert.equal((await owner("POST", `/api/approvals/${t1.approval_id}/decision`, { decision: "approved" })).status, 200);
   assert.equal((await owner("GET", `/api/tasks/${t1.id}`)).body.task.status, "scheduled");
   assert.equal((await owner("POST", `/api/approvals/${t1.approval_id}/decision`, { decision: "rejected" })).status, 409);
   await owner("POST", `/api/approvals/${t2.approval_id}/decision`, { decision: "rejected", note: "no" });
@@ -214,13 +218,17 @@ test("demo data is flagged, hidden by default, read-only, and excluded from brie
   assert.equal((await owner("GET", "/api/overview")).body.demo_records, 0);
 });
 
-test("integrations report disconnected without secrets", async () => {
+test("integrations report not configured without secrets", async () => {
   const { body } = await owner("GET", "/api/integrations");
   const s = Object.fromEntries(body.integrations.map((i) => [i.key, i.status]));
   assert.equal(s.internal, "connected");
-  assert.equal(s.stripe, "disconnected");
-  assert.equal(s.anthropic, "disconnected");
-  assert.equal(s.make_inbound, "configured");
+  assert.equal(s.stripe, "not_configured");
+  assert.equal(s.anthropic, "not_configured");
+  assert.equal(s.ringcentral, "not_configured");
+  assert.equal(s.google_sheets, "not_configured");
+  assert.equal(s.make_outbound, "not_configured");
+  // Secret set, and the signed webhook test above delivered a verified report.
+  assert.equal(s.make_inbound, "connected");
   assert.equal((await owner("POST", "/api/integrations/stripe/test", {})).status, 409);
   const fin = await owner("GET", "/api/finance");
   assert.equal(fin.body.connected, false);

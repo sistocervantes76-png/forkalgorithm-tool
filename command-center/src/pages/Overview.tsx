@@ -1,5 +1,5 @@
 import { TASK_STATUS_LABELS, type TaskStatus } from "../../shared/domain";
-import { fmtDate, fmtMoney, fmtRelative, useApi, withDemo } from "../api";
+import { fmtDate, fmtRelative, useApi, withDemo } from "../api";
 import { AgentAvatar, type Agent } from "../components/Nameplate";
 import { Badge, Button, Card, DemoBadge, Empty, ErrorNote, HBarList, IntegrationPill, Loading, PageHeader, Stat, StatusPill, useApp } from "../components/ui";
 
@@ -18,7 +18,6 @@ export default function Overview() {
   const activity = useApi(withDemo("/api/activity?limit=15", demo), [demo]);
   const approvals = useApi(withDemo("/api/approvals?status=open", demo), [demo]);
   const alerts = useApi(withDemo("/api/alerts?open=1", demo), [demo]);
-  const finance = useApi("/api/finance");
 
   if (ov.loading && !ov.data) return <Loading />;
   if (ov.error) return <ErrorNote error={ov.error} />;
@@ -26,14 +25,13 @@ export default function Overview() {
   const t: Record<string, number> = o.tasks ?? {};
   const totalTasks = Object.values(t).reduce((a, b) => a + b, 0);
   const done = (t.completed ?? 0) + (t.failed ?? 0);
-  const runs = o.workflow_runs_7d ?? {};
   const connected = o.integrations.filter((i: any) => i.status === "connected").length;
 
   return (
     <>
       <PageHeader
-        title="Company overview"
-        subtitle="Live view of your agent team. Every number below comes from Command Center records or a connected service. Nothing is estimated."
+        title="Operations overview"
+        subtitle="The business behind the public page: decisions waiting on you, work in progress, and what has actually run. Every number comes from Command Center records or a verified connection."
         actions={<Button variant="primary" onClick={() => navigate("/tasks?new=1")}>New task</Button>}
       />
 
@@ -44,7 +42,11 @@ export default function Overview() {
       )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Agents enabled" value={`${o.agents.enabled} / ${o.agents.total}`} sub={`${o.agents.with_backend} with an execution backend`} />
+        <Stat
+          label="Agents ready to execute"
+          value={agents.data ? `${agents.data.agents.filter((a) => a.readiness?.ready).length} / ${o.agents.total}` : "…"}
+          sub={`${o.agents.enabled} profiles enabled. Enabled is not running.`}
+        />
         <Stat label="Open tasks" value={(t.scheduled ?? 0) + (t.running ?? 0) + (t.proposed ?? 0) + (t.paused ?? 0)} sub={`${t.running ?? 0} running · ${t.scheduled ?? 0} scheduled`} />
         <Stat label="Awaiting your approval" value={o.approvals_pending} tone={o.approvals_pending ? "warn" : undefined} sub={<button className="underline" onClick={() => navigate("/approvals")}>Open decision queue</button>} />
         <Stat
@@ -70,9 +72,9 @@ export default function Overview() {
                     <AgentAvatar agent={a} size={34} />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">{a.name} <span className="font-normal text-ink-3">· {a.role_title}</span></div>
-                      <div className="truncate text-xs text-ink-3">{a.current_assignment ? a.current_assignment.title : a.connection.label}</div>
+                      <div className="truncate text-xs text-ink-3">{a.current_assignment ? a.current_assignment.title : a.last_confirmed_execution_at ? `Last verified run ${fmtRelative(a.last_confirmed_execution_at)}` : "No verified executions yet"}</div>
                     </div>
-                    {a.current_assignment ? <StatusPill status={a.current_assignment.status} /> : <Badge>{a.enabled ? (a.paused ? "Paused" : "Idle") : "Disabled"}</Badge>}
+                    {a.current_assignment ? <StatusPill status={a.current_assignment.status} /> : <Badge tone={a.readiness?.ready ? "ok" : "neutral"}>{a.readiness?.ready ? "Ready" : "Not running"}</Badge>}
                   </button>
                 </li>
               ))}
@@ -92,6 +94,14 @@ export default function Overview() {
             </>
           ) : (
             <Empty title="No tasks yet">Create a task and assign it to an agent to start tracking work.</Empty>
+          )}
+        </Card>
+
+        <Card title="Verified executions" subtitle="Attempts a worker or executor confirmed finished">
+          {o.verified_executions ? (
+            <div className="text-2xl font-semibold tabular-nums">{o.verified_executions}</div>
+          ) : (
+            <Empty title="No verified executions yet">Nothing has run through a configured backend. Plans, drafts and demonstration data do not count.</Empty>
           )}
         </Card>
 
@@ -137,49 +147,18 @@ export default function Overview() {
           )}
         </Card>
 
-        <Card title="Sales pipeline" action={<Button size="sm" variant="ghost" onClick={() => navigate("/intel")}>Outreach →</Button>}>
-          {o.pipeline.length ? (
-            <HBarList rows={o.pipeline.map((p: any) => ({ label: p.status.replaceAll("_", " "), value: p.n }))} />
-          ) : (
-            <Empty title="No prospects on record">Add researched prospects in Market & Outreach.</Empty>
-          )}
-        </Card>
-
-        <Card title="Workflow performance (7 days)" action={<Button size="sm" variant="ghost" onClick={() => navigate("/workflows")}>Runs →</Button>}>
-          {runs.total ? (
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div><div className="text-xl font-semibold tabular-nums">{runs.total}</div><div className="text-xs text-ink-3">runs</div></div>
-              <div><div className="text-xl font-semibold tabular-nums text-ok">{runs.completed ?? 0}</div><div className="text-xs text-ink-3">succeeded</div></div>
-              <div><div className="text-xl font-semibold tabular-nums text-bad">{runs.failed ?? 0}</div><div className="text-xs text-ink-3">failed</div></div>
-            </div>
-          ) : (
-            <Empty title="No workflow runs reported">Runs appear when Make.com posts to the inbound webhook.</Empty>
-          )}
-        </Card>
-
-        <Card title="Financial overview" action={<Button size="sm" variant="ghost" onClick={() => navigate("/finance")}>Finance →</Button>}>
-          {finance.data?.connected ? (
-            <div className="space-y-1 text-sm">
-              {Object.entries(finance.data.summary.last_30_days.gross_cents_by_currency as Record<string, number>).map(([cur, v]) => (
-                <div key={cur} className="flex justify-between"><span className="text-ink-3">Gross, last 30 days</span><strong>{fmtMoney(v, cur)}</strong></div>
-              ))}
-              <div className="text-xs text-ink-3">Source: Stripe ({finance.data.summary.livemode ? "live" : "test"} mode), fetched {fmtRelative(finance.data.summary.fetched_at)}</div>
-            </div>
-          ) : (
-            <Empty title="Stripe disconnected">{finance.data?.reason ?? "Checking…"}</Empty>
-          )}
-        </Card>
-
-        <Card title="Weekly CEO briefing" action={<Button size="sm" variant="ghost" onClick={() => navigate("/briefings")}>Briefings →</Button>}>
+        <Card title="Weekly CEO review" action={<Button size="sm" variant="ghost" onClick={() => navigate("/briefings")}>Reviews →</Button>}>
           {o.latest_briefing ? (
             <div className="text-sm">
               <div>Week of {fmtDate(o.latest_briefing.week_of, false)}</div>
               <div className="text-xs text-ink-3">Generated {fmtRelative(o.latest_briefing.generated_at)} · {o.latest_briefing.generated_by === "aggregation" ? "records summary" : "records + AI narrative"}</div>
             </div>
           ) : (
-            <Empty title="No briefing yet" />
+            <Empty title="No review yet" />
           )}
-          <p className="mt-2 text-xs text-ink-3">Next scheduled: {fmtDate(o.next_briefing)} (Friday)</p>
+          <p className="mt-2 text-xs text-ink-3">
+            Next scheduled: {fmtDate(o.next_briefing)} ({o.review_schedule.day[0].toUpperCase() + o.review_schedule.day.slice(1)}, {o.review_schedule.hour}:00 {o.review_schedule.timezone})
+          </p>
         </Card>
 
         <Card title="System alerts" action={<Button size="sm" variant="ghost" onClick={() => navigate("/alerts")}>All →</Button>}>

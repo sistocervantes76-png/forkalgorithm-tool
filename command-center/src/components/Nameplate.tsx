@@ -28,6 +28,8 @@ export interface Agent {
   last_heartbeat_at: string | null;
   last_confirmed_execution_at: string | null;
   connection: { state: string; label: string };
+  readiness: { ready: boolean; summary: string; checks: { key: string; label: string; ok: boolean; detail: string }[] } | null;
+  verified_execution: { last_at: string | null; label?: string };
   current_assignment: { id: string; title: string; status: any } | null;
   stats: { completed: number; failed: number; open: number; completion_rate: number | null; error_count_30d: number };
 }
@@ -45,6 +47,7 @@ export const ACCENTS: Record<string, { bg: string; ring: string; text: string }>
 
 const CONN_TONE: Record<string, { dot: string; tone: Parameters<typeof Badge>[0]["tone"] }> = {
   ready: { dot: "bg-emerald-500", tone: "ok" },
+  configured: { dot: "bg-info", tone: "info" },
   online: { dot: "bg-emerald-500", tone: "ok" },
   offline: { dot: "bg-bad", tone: "bad" },
   disconnected: { dot: "bg-bad", tone: "bad" },
@@ -71,6 +74,37 @@ export function ConnectionBadge({ connection }: { connection: Agent["connection"
       <span className={cx("h-1.5 w-1.5 rounded-full", c.dot)} aria-hidden="true" />
       {connection.label}
     </Badge>
+  );
+}
+
+/** Ready only when profile, backend, credentials and authorized tools all check out. */
+export function ReadinessBadge({ agent }: { agent: Pick<Agent, "readiness" | "connection"> }) {
+  if (!agent.readiness) return <ConnectionBadge connection={agent.connection} />;
+  const r = agent.readiness;
+  return (
+    <Badge tone={r.ready ? "ok" : "neutral"} title={r.checks.map((c) => `${c.ok ? "✓" : "✕"} ${c.label}: ${c.detail}`).join("\n")}>
+      <span className={cx("h-1.5 w-1.5 rounded-full", r.ready ? "bg-emerald-500" : "bg-ink-3")} aria-hidden="true" />
+      {r.ready ? "Ready to execute" : "Not running"}
+    </Badge>
+  );
+}
+
+export function ReadinessChecklist({ readiness }: { readiness: NonNullable<Agent["readiness"]> }) {
+  return (
+    <ul className="space-y-1.5 text-sm">
+      {readiness.checks.map((c) => (
+        <li key={c.key} className="flex items-start gap-2">
+          <span className={cx("mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold", c.ok ? "bg-ok text-white" : "bg-creme-3 text-ink-2")} aria-hidden="true">
+            {c.ok ? "✓" : "✕"}
+          </span>
+          <span>
+            <span className="font-medium">{c.label}</span>
+            <span className="block text-xs text-ink-3">{c.detail}</span>
+          </span>
+        </li>
+      ))}
+      <li className="pt-1 text-xs text-ink-3">Tasks that need approval also run only after you approve their exact action.</li>
+    </ul>
   );
 }
 
@@ -107,11 +141,13 @@ export function Nameplate({ agent, department, onOpen }: { agent: Agent; departm
             {department ? ` · ${department}` : ""}
           </div>
         </div>
-        <Badge tone={agent.enabled ? (agent.paused ? "tan" : "ok") : "neutral"}>{agent.enabled ? (agent.paused ? "Paused" : "Enabled") : "Disabled"}</Badge>
+        <Badge tone={agent.enabled ? (agent.paused ? "tan" : "neutral") : "neutral"} title="An enabled profile does not start a running agent">
+          {agent.enabled ? (agent.paused ? "Paused" : "Profile on") : "Profile off"}
+        </Badge>
       </div>
 
-      <div className="px-4 pt-3">
-        <ConnectionBadge connection={agent.connection} />
+      <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+        <ReadinessBadge agent={agent} />
       </div>
 
       <div className="mt-3 border-t border-creme-2 px-4 py-2 text-xs">
@@ -122,28 +158,33 @@ export function Nameplate({ agent, department, onOpen }: { agent: Agent; departm
         {agent.current_assignment && <div className="mt-1 truncate text-ink-2">{agent.current_assignment.title}</div>}
       </div>
 
-      <dl className="grid grid-cols-4 gap-2 border-t border-creme-2 px-4 py-3 text-xs">
-        <div>
-          <dt className="text-ink-3">Completion</dt>
-          <dd className="font-semibold tabular-nums">{agent.stats.completion_rate === null ? "—" : `${agent.stats.completion_rate}%`}</dd>
+      {agent.last_confirmed_execution_at ? (
+        <dl className="grid grid-cols-4 gap-2 border-t border-creme-2 px-4 py-3 text-xs">
+          <div>
+            <dt className="text-ink-3">Completion</dt>
+            <dd className="font-semibold tabular-nums">{agent.stats.completion_rate === null ? "—" : `${agent.stats.completion_rate}%`}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-3">Errors 30d</dt>
+            <dd className={cx("font-semibold tabular-nums", agent.stats.error_count_30d > 0 && "text-bad")}>{agent.stats.error_count_30d}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-3">Last verified</dt>
+            <dd className="font-semibold" title={agent.last_confirmed_execution_at}>{fmtRelative(agent.last_confirmed_execution_at)}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-3">Authority</dt>
+            <dd className="pt-1">
+              <AuthorityPips level={agent.authority_level} />
+            </dd>
+          </div>
+        </dl>
+      ) : (
+        <div className="flex items-center justify-between gap-2 border-t border-creme-2 px-4 py-3 text-xs">
+          <span className="text-ink-3">No verified executions yet</span>
+          <AuthorityPips level={agent.authority_level} />
         </div>
-        <div>
-          <dt className="text-ink-3">Errors 30d</dt>
-          <dd className={cx("font-semibold tabular-nums", agent.stats.error_count_30d > 0 && "text-bad")}>{agent.stats.error_count_30d}</dd>
-        </div>
-        <div>
-          <dt className="text-ink-3">Last run</dt>
-          <dd className="font-semibold" title={agent.last_confirmed_execution_at ?? "No confirmed execution"}>
-            {agent.last_confirmed_execution_at ? fmtRelative(agent.last_confirmed_execution_at) : "never"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-ink-3">Authority</dt>
-          <dd className="pt-1">
-            <AuthorityPips level={agent.authority_level} />
-          </dd>
-        </div>
-      </dl>
+      )}
       <div className="rounded-b-xl bg-creme-2/60 px-4 py-1.5 text-[11px] text-ink-3">{AUTONOMY_INFO[agent.autonomy].label} · {agent.priority} priority</div>
     </button>
   );
